@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# 
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "chatter-new-console", "Console\chatter-new-console.csproj", "{D47415B3-AA8A-471F-8113-FFA966C239C6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "chatter-new", "Lib\chatter-new.csproj", "{317BB980-F2DC-4784-AE73-C82658A2ADB5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "chatter-new-tests", "Tests\chatter-new-tests.csproj", "{E7AC46AE-6F1C-4FEF-B380-4BF0E6F26603}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D47415B3-AA8A-471F-8113-FFA966C239C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D47415B3-AA8A-471F-8113-FFA966C239C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D47415B3-AA8A-471F-8113-FFA966C239C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D47415B3-AA8A-471F-8113-FFA966C239C6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{317BB980-F2DC-4784-AE73-C82658A2ADB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{317BB980-F2DC-4784-AE73-C82658A2ADB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{317BB980-F2DC-4784-AE73-C82658A2ADB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{317BB980-F2DC-4784-AE73-C82658A2ADB5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E7AC46AE-6F1C-4FEF-B380-4BF0E6F26603}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E7AC46AE-6F1C-4FEF-B380-4BF0E6F26603}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E7AC46AE-6F1C-4FEF-B380-4BF0E6F26603}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E7AC46AE-6F1C-4FEF-B380-4BF0E6F26603}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
