@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Text;
+using System.Text.Json;
 using chatter_new.Messaging;
 
 Console.InputEncoding = Encoding.Unicode;
@@ -32,8 +33,16 @@ Console.CancelKeyPress += (_, __) =>
     running = false;
 };
 
-sess.OnReceive += (sender, container) 
-    => Console.WriteLine(container.text);
+string nick = "";
+
+sess.OnReceive += GetName;
+
+sess.OnReceive += (sender, container) =>
+{
+    var json = JsonDocument.Parse(container.text);
+    if (json.RootElement.GetProperty(nameof(IMessage.Type)).GetString() == nameof(TextMessage))
+        Console.WriteLine(nick + ": " + json.RootElement.GetProperty(nameof(TextMessage.text)).GetString());
+};
 
 while (running)
 {
@@ -44,4 +53,15 @@ while (running)
         if(!string.IsNullOrEmpty(inp))
             sess.SendMessage(new TextMessage(inp));
     }
+}
+
+void GetName(object? sender, BytesContainer container)
+{
+    var json = JsonDocument.Parse(container.text);
+    if (json.RootElement.GetProperty(nameof(IMessage.Type)).GetString() == nameof(UserInfoMessage))
+    {
+        nick = json.RootElement.GetProperty(nameof(UserInfoMessage.name)).GetString()!;
+    }
+
+    sess.OnReceive -= GetName;
 }
