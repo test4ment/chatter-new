@@ -3,9 +3,9 @@ using System.Text.Json.Serialization;
 
 namespace chatter_new.Messaging;
 
-public interface IMessage
+public abstract class BaseMessage
 {
-    public string Type { get; }
+    public string Type => GetType().Name;
 
     public string Serialize()
     {
@@ -16,21 +16,21 @@ public interface IMessage
 }
 
 [method: JsonConstructor]
-public record TextMessage([property: JsonInclude] string text): IMessage
+public class TextMessage(string text): BaseMessage
 {
-    public string Type { get; } = nameof(TextMessage);
+    public string Text { get; init; } = text;
 }
 
 [method: JsonConstructor]
-public record UserInfoMessage(string name): IMessage
+public class UserInfoBaseMessage(string name): BaseMessage
 {
-    public string Type { get; } = nameof(UserInfoMessage);
+    public string Name { get; init; } = name;
 }
 
 [method: JsonConstructor]
-public record SystemMessage(SystemMessage.SysMsgType type): IMessage
+public class SystemBaseMessage(SystemBaseMessage.SysMsgType type): BaseMessage
 {
-    public string Type { get; } = nameof(SystemMessage);
+    public SysMsgType SystemType { get; init; } = type;
 
     public enum SysMsgType
     {

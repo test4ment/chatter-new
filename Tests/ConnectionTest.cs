@@ -29,8 +29,8 @@ public class ConnectionTest
         server.Send(Encoding.ASCII.GetBytes(msg_response));
         var received_client = client.Receive();
         
-        Assert.Equal(msg, Encoding.ASCII.GetString(received_server.ToArray()));
-        Assert.Equal(msg_response, Encoding.ASCII.GetString(received_client.ToArray()));
+        Assert.Equal(msg, Encoding.ASCII.GetString(received_server));
+        Assert.Equal(msg_response, Encoding.ASCII.GetString(received_client));
     }
 
     [Fact]

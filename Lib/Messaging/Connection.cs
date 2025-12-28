@@ -5,7 +5,6 @@ namespace chatter_new.Messaging;
 
 public interface IConnection: IDisposable
 {
-    public static readonly byte EOT = 0x03;
     public void Send(byte[] data);
     public byte[] Receive();
     public void Send(BytesContainer bytesContainer) => Send(bytesContainer.GetBytes());
@@ -16,7 +15,7 @@ public class SocketConnection(Socket sock) : IConnection, IDisposable
     private byte[] buffer = new byte[1024 * 4];
     public void Send(byte[] data)
     {
-        sock.Send(data.Append<byte>(IConnection.EOT).ToArray());
+        sock.Send(data);
     }
 
     public byte[] Receive()

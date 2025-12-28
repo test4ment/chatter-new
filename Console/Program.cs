@@ -1,7 +1,11 @@
 ﻿using System.Net;
+using System.Numerics;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using chatter_new.Messaging;
+using chatter_new.Messaging.Session;
 
 Console.InputEncoding = Encoding.Unicode;
 Console.OutputEncoding = Encoding.Unicode;
@@ -10,18 +14,18 @@ Console.OutputEncoding = Encoding.Unicode;
 Console.WriteLine("Hello, World!");
 
 var ip = new IPEndPoint(IPAddress.Loopback, 50001);
-Session sess;
+EncryptedSession sess;
 
 if (Console.ReadKey(true).Key == ConsoleKey.C )
 {
     Console.WriteLine("Connect mode");
-    sess = Session.CreateSession("foo", SocketConnection.ConnectTo(ip));
+    sess = EncryptedSession.Create(SocketConnection.ConnectTo(ip), "foo");
     Console.WriteLine("Connected");
 }
 else
 {
     Console.WriteLine("Await mode");
-    sess = Session.CreateSession("bar", SocketConnection.ListenAndAwaitClient(ip));
+    sess = EncryptedSession.Create(SocketConnection.ListenAndAwaitClient(ip), "bar");
     Console.WriteLine("Client connected");
 }
 
@@ -39,9 +43,12 @@ sess.OnReceive += GetName;
 
 sess.OnReceive += (sender, container) =>
 {
-    var json = JsonDocument.Parse(container.text);
-    if (json.RootElement.GetProperty(nameof(IMessage.Type)).GetString() == nameof(TextMessage))
-        Console.WriteLine(nick + ": " + json.RootElement.GetProperty(nameof(TextMessage.text)).GetString());
+    var json = JsonDocument.Parse(container);
+    if (json.RootElement.GetProperty(nameof(BaseMessage.Type)).GetString() == nameof(TextMessage))
+    {
+        var msg = json.Deserialize<TextMessage>();
+        Console.WriteLine(nick + ": " + msg?.Text);
+    }
 };
 
 while (running)
@@ -55,12 +62,12 @@ while (running)
     }
 }
 
-void GetName(object? sender, BytesContainer container)
+void GetName(object? sender, string msg)
 {
-    var json = JsonDocument.Parse(container.text);
-    if (json.RootElement.GetProperty(nameof(IMessage.Type)).GetString() == nameof(UserInfoMessage))
+    var json = JsonDocument.Parse(msg);
+    if (json.RootElement.GetProperty(nameof(BaseMessage.Type)).GetString() == nameof(UserInfoBaseMessage))
     {
-        nick = json.RootElement.GetProperty(nameof(UserInfoMessage.name)).GetString()!;
+        nick = json.RootElement.GetProperty(nameof(UserInfoBaseMessage.Name)).GetString()!;
     }
 
     sess.OnReceive -= GetName;
