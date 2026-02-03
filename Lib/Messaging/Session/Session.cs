@@ -7,5 +7,5 @@ public interface ISession
     public void SendMessage(BaseMessage message);
     public void CheckForIncoming();
     public event EventHandler<BaseMessage>? OnSend;
-    public event EventHandler<string>? OnReceive;
+    public event EventHandler<BaseMessage>? OnReceive;
 }

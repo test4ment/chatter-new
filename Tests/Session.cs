@@ -28,12 +28,10 @@ public class SessionTest
         sess1.SendMessage(new TextMessage("text"));
 
         int called = 0;
-        sess2.OnReceive += (sender, s) =>
-        {
+        sess2.OnReceive += (sender, s) => {
             called++;
-            var json = JsonDocument.Parse(s);
-            var msg = json.Deserialize<TextMessage>();
-            Assert.Equal("text", msg!.Text);
+            Assert.True(s is TextMessage msg);
+            Assert.Equal("text", ((TextMessage)s).Text);
         };
         
         sess2.CheckForIncoming();
@@ -61,12 +59,10 @@ public class SessionTest
         sess1.SendMessage(new TextMessage("text"));
 
         int called = 0;
-        sess2.OnReceive += (sender, s) =>
-        {
+        sess2.OnReceive += (sender, s) => {
             called++;
-            var json = JsonDocument.Parse(s);
-            var msg = json.Deserialize<TextMessage>();
-            Assert.Equal("text", msg!.Text);
+            Assert.True(s is TextMessage msg);
+            Assert.Equal("text", ((TextMessage)s).Text);
         };
         
         sess2.CheckForIncoming();

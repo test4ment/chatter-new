@@ -40,9 +40,8 @@ string nick = "";
 
 sess.OnReceive += GetName;
 
-sess.OnReceive += (sender, container) =>
+sess.OnReceive += (sender, msg) =>
 {
-    var msg = JsonSerializer.Deserialize<BaseMessage>(container);
     if (msg is TextMessage tmsg)
     {
         Console.WriteLine(nick + ": " + tmsg.Text);
@@ -107,12 +106,11 @@ while (running)
     }
 }
 
-void GetName(object? sender, string json)
+void GetName(object? sender, BaseMessage msg)
 {
-    var msg = JsonSerializer.Deserialize<BaseMessage>(json);
     if (msg is UserInfoMessage userInfo)
     {
-        nick = userInfo!.Name;
+        nick = userInfo.Name;
     }
 
     sess.OnReceive -= GetName;

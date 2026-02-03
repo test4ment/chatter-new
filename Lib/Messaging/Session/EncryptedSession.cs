@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Text.Json;
 using chatter_new.Messaging.Messages;
 
@@ -14,7 +13,7 @@ public class EncryptedSession: ISession, IDisposable
     private MessageMetadata? metadata = null;
     
     public event EventHandler<BaseMessage>? OnSend;
-    public event EventHandler<string>? OnReceive;
+    public event EventHandler<BaseMessage>? OnReceive;
     private EncryptedSession(IConnection connection)
     {
         this.connection = connection;
@@ -98,7 +97,7 @@ public class EncryptedSession: ISession, IDisposable
     private void ProccessMessage()
     {
         var msg = ReadMessage().Decode();
-        OnReceive?.Invoke(this, msg);
+        OnReceive?.Invoke(this, JsonSerializer.Deserialize<BaseMessage>(msg)!);
         metadata = null;
     }
 

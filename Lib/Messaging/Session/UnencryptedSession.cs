@@ -1,3 +1,4 @@
+using System.Text.Json;
 using chatter_new.Messaging.Messages;
 
 namespace chatter_new.Messaging.Session;
@@ -13,7 +14,7 @@ public class Session : ISession, IDisposable
         this.connection = connection;
     }
     public event EventHandler<BaseMessage>? OnSend;
-    public event EventHandler<string>? OnReceive;
+    public event EventHandler<BaseMessage>? OnReceive;
     
     public static Session CreateSession(string name, IConnection connection)
     {
@@ -51,7 +52,7 @@ public class Session : ISession, IDisposable
             var msg = BytesHelper.Decode(buffer[..leftToReceive].ToArray());
             buffer.RemoveRange(0, leftToReceive);
             leftToReceive = 0;
-            OnReceive?.Invoke(this, msg);
+            OnReceive?.Invoke(this, JsonSerializer.Deserialize<BaseMessage>(msg)!);
         }
     }
     
