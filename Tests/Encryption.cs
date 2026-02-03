@@ -29,15 +29,15 @@ public class Encryption
         var shared_alice = alice.DerivePrivateKey(bob.PublicKey);
         var shared_bob = bob.DerivePrivateKey(alice.PublicKey);
         
-        var msg = new BytesContainer("Hello world! Hello world! Hello world!");
+        var msg = BytesHelper.Encode("Hello world! Hello world! Hello world!");
 
         var alice_enc = new BytesEncryption(shared_alice);
-        var encrypted = alice_enc.Encrypt(msg.GetBytes());
+        var encrypted = alice_enc.Encrypt(msg);
         
         var bob_dec = new BytesEncryption(shared_bob);
         var decrypted = bob_dec.Decrypt(encrypted);
 
-        Assert.Equal(msg, new BytesContainer(decrypted));
-        Assert.NotEqual(msg, new BytesContainer(encrypted));
+        Assert.Equal(msg, decrypted);
+        Assert.NotEqual(msg, encrypted);
     }
 }

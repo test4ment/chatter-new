@@ -7,7 +7,6 @@ public interface IConnection
 {
     public void Send(byte[] data);
     public byte[] Receive();
-    public void Send(BytesContainer bytesContainer) => Send(bytesContainer.GetBytes());
 }
 
 public class SocketConnection(Socket sock) : IConnection, IDisposable

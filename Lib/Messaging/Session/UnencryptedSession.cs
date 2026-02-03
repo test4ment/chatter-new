@@ -4,9 +4,10 @@ namespace chatter_new.Messaging.Session;
 
 public class Session : ISession, IDisposable
 {
-    public const byte EOT = 0x03;
     private readonly List<byte> buffer = new List<byte>();
     private readonly IConnection connection;
+    private int leftToReceive = 0;
+    
     private Session(IConnection connection)
     {
         this.connection = connection;
@@ -24,8 +25,10 @@ public class Session : ISession, IDisposable
     
     public void SendMessage(BaseMessage msg)
     {
-        var bytes = new BytesContainer(msg.Serialize());
-        connection.Send(bytes.GetBytes().Append<byte>(EOT).ToArray());
+        var bytes = BytesHelper.Encode(msg.Serialize());
+        var len = BytesHelper.Encode(bytes.Length);
+        connection.Send(len);
+        connection.Send(bytes.ToArray());
         OnSend?.Invoke(this, msg);
     }
 
@@ -33,14 +36,22 @@ public class Session : ISession, IDisposable
     {
         buffer.AddRange(connection.Receive());
 
-        var eof = buffer.IndexOf(EOT); // TODO: 0x03 may exist in unicode
-        while(eof >= 0)
+        while (true)
         {
-            var msg = new BytesContainer(buffer[..eof].ToArray());
-            buffer.RemoveRange(0, eof+1);
-            OnReceive?.Invoke(this, msg.text);
+            if (leftToReceive == 0)
+                if (buffer.Count >= sizeof(int))
+                {
+                    leftToReceive = BytesHelper.DecodeInt(buffer[..sizeof(int)]);
+                    buffer.RemoveRange(0, sizeof(int));
+                } else return;
+
+            if (buffer.Count < leftToReceive)
+                return;
             
-            eof = buffer.IndexOf(EOT);
+            var msg = BytesHelper.Decode(buffer[..leftToReceive].ToArray());
+            buffer.RemoveRange(0, leftToReceive);
+            leftToReceive = 0;
+            OnReceive?.Invoke(this, msg);
         }
     }
     

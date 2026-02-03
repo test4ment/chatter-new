@@ -43,22 +43,22 @@ public class ConnectionTest
         using var client = SocketConnection.ConnectTo(addr);
         t.Join();
         
-        var clientname = new BytesContainer("Alice");
-        var servername = new BytesContainer("Bob");
+        var clientname = "Alice";
+        var servername = "Bob";
         
-        client.Send(clientname.GetBytes());
+        client.Send(clientname.Encode());
         var data = server!.Receive();
         while (data.Length == 0)
             data = server.Receive();
-        var received_client = new BytesContainer(data);
+        var received_client = data.Decode();
         
-        server.Send(servername.GetBytes());
+        server.Send(servername.Encode());
         data = client.Receive();
         while (data.Length == 0)
             data = server.Receive();
-        var received_server = new BytesContainer(data);
+        var received_server = data.Decode();
         
-        Assert.Equal(clientname.ToString(), received_client.ToString());
-        Assert.Equal(servername.ToString(), received_server.ToString());
+        Assert.Equal(clientname, received_client);
+        Assert.Equal(servername, received_server);
     }
 }

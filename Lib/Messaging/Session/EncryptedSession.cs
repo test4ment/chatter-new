@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Text.Json;
 using chatter_new.Messaging.Messages;
 
 namespace chatter_new.Messaging.Session;
@@ -10,6 +11,7 @@ public class EncryptedSession: ISession, IDisposable
     private DHKeyExchange? keyExchange = null;
     private BytesEncryption? encryption = null;
     private int leftToReceive = 0;
+    private MessageMetadata? metadata = null;
     
     public event EventHandler<BaseMessage>? OnSend;
     public event EventHandler<string>? OnReceive;
@@ -49,43 +51,63 @@ public class EncryptedSession: ISession, IDisposable
     }
     public void SendMessage(BaseMessage message)
     {
-        var bytes = new BytesContainer(message.Serialize()).GetBytes();
+        var bytes = message.Serialize().Encode();
         var encryptbytes = encryption!.Encrypt(bytes);
         
-        SendSize(bytes.Length);
+        var meta = new MessageMetadata(){ContentSize = encryptbytes.Length, TrackProgress = false}.Serialize();
+        var metab = meta.Encode();
+        var metaenc = encryption!.Encrypt(metab);
+        
+        connection.Send(metaenc.Length.Encode());
+        connection.Send(metaenc);
         connection.Send(encryptbytes);
         
         OnSend?.Invoke(this, message);
     }
 
-    private void SendSize(int size)
-    {
-        var len = new byte[4]; 
-        BinaryPrimitives.WriteInt32BigEndian(len, size);
-        connection.Send(len);
-    }
-
     public void CheckForIncoming()
     {
         buffer.AddRange(connection.Receive());
-        while(true) {
+        while(true)
+        {
             if (leftToReceive == 0)
                 if (buffer.Count >= 4)
                 {
-                    leftToReceive = BinaryPrimitives.ReadInt32BigEndian(buffer[..4].ToArray());
+                    leftToReceive = buffer[..sizeof(int)].ToArray().DecodeInt();
                     buffer.RemoveRange(0, 4);
                 } else return;
-
-            if (buffer.Count >= leftToReceive)
-            {
-                var msgb = encryption!.Decrypt(buffer[..leftToReceive].ToArray());
-                buffer.RemoveRange(0, leftToReceive);
-                leftToReceive = 0;
-
-                var msg = new BytesContainer(msgb);
-                OnReceive?.Invoke(this, msg.text);
-            } else return;
+            
+            if (buffer.Count < leftToReceive)
+                return;
+            
+            if (metadata == null)
+                ProccessMeta();
+            else {
+                ProccessMessage();
+            }
         }
+    }
+
+    private void ProccessMeta()
+    {
+        var msg = ReadMessage().Decode();
+        metadata = JsonSerializer.Deserialize<MessageMetadata>(msg);
+        leftToReceive = metadata!.ContentSize;
+    }
+
+    private void ProccessMessage()
+    {
+        var msg = ReadMessage().Decode();
+        OnReceive?.Invoke(this, msg);
+        metadata = null;
+    }
+
+    private byte[] ReadMessage()
+    {
+        var msgb = encryption!.Decrypt(buffer[..leftToReceive].ToArray());
+        buffer.RemoveRange(0, leftToReceive);
+        leftToReceive = 0;
+        return msgb;
     }
     
     public void Close()
