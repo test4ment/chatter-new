@@ -1,5 +1,4 @@
-using System.Net.Sockets;
-using System.Security.Cryptography;
+using System.Buffers.Binary;
 
 namespace chatter_new.Messaging.Session;
 
@@ -7,19 +6,16 @@ public class EncryptedSession: ISession, IDisposable
 {
     private readonly IConnection connection;
     private readonly List<byte> buffer = new List<byte>();
-    private readonly byte[] enc_buffer = new byte[1024];
     private byte[]? Key = null;
     private DHKeyExchange? keyExchange = null;
     private BytesEncryption? encryption = null;
-    private CryptoStream? cryptostream = null;
-    private MemoryStream memstream;
+    private int leftToReceive = 0;
     
     public event EventHandler<BaseMessage>? OnSend;
     public event EventHandler<string>? OnReceive;
     private EncryptedSession(IConnection connection)
     {
         this.connection = connection;
-        memstream = new MemoryStream();
     }
 
     public static EncryptedSession Create(IConnection connection, string name)
@@ -36,7 +32,7 @@ public class EncryptedSession: ISession, IDisposable
     private void SendHandshake()
     {
         keyExchange = new DHKeyExchange();
-        connection.Send(keyExchange.PublicKey.Append<byte>(UnencryptedSession.EOT).ToArray());
+        connection.Send(keyExchange.PublicKey);
     }
     private void AwaitHandshake()
     {
@@ -50,53 +46,49 @@ public class EncryptedSession: ISession, IDisposable
         keyExchange.Dispose();
         
         encryption = new BytesEncryption(Key);
-
-        cryptostream = new CryptoStream(memstream, encryption.GetDecryptor(), CryptoStreamMode.Read);
     }
     public void SendMessage(BaseMessage message)
     {
-        var bytes = new BytesContainer(message.Serialize());
-        var pl = bytes.GetBytes().Append<byte>(UnencryptedSession.EOT).ToArray();
-        connection.Send(encryption!.Encrypt(pl));
+        var bytes = new BytesContainer(message.Serialize()).GetBytes();
+        var encryptbytes = encryption!.Encrypt(bytes);
+        var len = new byte[4]; BinaryPrimitives.WriteInt32BigEndian(len, encryptbytes.Length);
+        connection.Send(len.Concat(encryptbytes).ToArray());
         OnSend?.Invoke(this, message);
     }
 
     public void CheckForIncoming()
     {
-        var pos = memstream.Position;
-        memstream.Write(connection.Receive());
-        memstream.Seek(pos, SeekOrigin.Begin);
+        buffer.AddRange(connection.Receive());
+        while(true) {
+            if (leftToReceive == 0)
+                if (buffer.Count >= 4)
+                {
+                    leftToReceive = BinaryPrimitives.ReadInt32BigEndian(buffer[..4].ToArray());
+                    buffer.RemoveRange(0, 4);
+                } else return;
 
-        int read = 0;
-        do
-        {
-            if(cryptostream!.HasFlushedFinalBlock)
-                cryptostream = new CryptoStream(memstream, encryption!.GetDecryptor(), CryptoStreamMode.Read);
-            read = cryptostream!.Read(enc_buffer);
-            buffer.AddRange(enc_buffer[..read]);
-        } while (read > 0);
-        
-        var eof = buffer.IndexOf(UnencryptedSession.EOT);
-        while(eof >= 0)
-        {
-            var msg = new BytesContainer(buffer[..eof].ToArray());
-            buffer.RemoveRange(0, eof+1);
-            OnReceive?.Invoke(this, msg.text);
-            
-            eof = buffer.IndexOf(UnencryptedSession.EOT);
+            if (buffer.Count >= leftToReceive)
+            {
+                var msgb = encryption!.Decrypt(buffer[..leftToReceive].ToArray());
+                buffer.RemoveRange(0, leftToReceive);
+                leftToReceive = 0;
+
+                var msg = new BytesContainer(msgb);
+                OnReceive?.Invoke(this, msg.text);
+            } else return;
         }
     }
     
     public void Close()
     {
         CheckForIncoming();
-        connection.Dispose();
+        if(connection is IDisposable disposable)
+            disposable.Dispose();
     }
     public void Dispose()
     {
-        connection.Dispose();
-        memstream.Dispose();
-        cryptostream?.Dispose();
+        if(connection is IDisposable disposable)
+            disposable.Dispose();
         keyExchange?.Dispose();
         Key = null;
         buffer.Clear();

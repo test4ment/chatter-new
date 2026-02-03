@@ -31,7 +31,7 @@ public class UnencryptedSession : ISession, IDisposable
     {
         buffer.AddRange(connection.Receive());
 
-        var eof = buffer.IndexOf(EOT);
+        var eof = buffer.IndexOf(EOT); // TODO: 0x03 may exist in unicode
         while(eof >= 0)
         {
             var msg = new BytesContainer(buffer[..eof].ToArray());
@@ -45,11 +45,13 @@ public class UnencryptedSession : ISession, IDisposable
     public void Close()
     {
         CheckForIncoming();
-        connection.Dispose();
+        if(connection is IDisposable disposable)
+            disposable.Dispose();
     }
 
     public void Dispose()
     {
-        connection.Dispose();
+        if(connection is IDisposable disposable)
+            disposable.Dispose();
     }
 }

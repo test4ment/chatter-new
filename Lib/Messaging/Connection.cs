@@ -3,7 +3,7 @@ using System.Net.Sockets;
 
 namespace chatter_new.Messaging;
 
-public interface IConnection: IDisposable
+public interface IConnection
 {
     public void Send(byte[] data);
     public byte[] Receive();

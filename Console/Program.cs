@@ -1,7 +1,4 @@
 ﻿using System.Net;
-using System.Numerics;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using chatter_new.Messaging;
@@ -33,6 +30,7 @@ bool running = true;
 Console.CancelKeyPress += (_, __) =>
 {
     Console.WriteLine("Exiting...");
+    sess.SendMessage(new SystemMessage(SystemMessage.SysMsgType.Left));
     sess.Close();
     running = false;
 };
@@ -43,11 +41,20 @@ sess.OnReceive += GetName;
 
 sess.OnReceive += (sender, container) =>
 {
-    var json = JsonDocument.Parse(container);
-    if (json.RootElement.GetProperty(nameof(BaseMessage.Type)).GetString() == nameof(TextMessage))
+    var msg = JsonSerializer.Deserialize<BaseMessage>(container);
+    if (msg is TextMessage tmsg)
     {
-        var msg = json.Deserialize<TextMessage>();
-        Console.WriteLine(nick + ": " + msg?.Text);
+        Console.WriteLine(nick + ": " + tmsg.Text);
+    }
+
+    if (msg is SystemMessage smsg)
+    {
+        if (smsg.SystemType == SystemMessage.SysMsgType.Left)
+        {
+            Console.WriteLine($"{nick} has left. Exiting...");
+            sess.Close();
+            running = false;
+        }
     }
 };
 
@@ -62,12 +69,12 @@ while (running)
     }
 }
 
-void GetName(object? sender, string msg)
+void GetName(object? sender, string json)
 {
-    var json = JsonDocument.Parse(msg);
-    if (json.RootElement.GetProperty(nameof(BaseMessage.Type)).GetString() == nameof(UserInfoBaseMessage))
+    var msg = JsonSerializer.Deserialize<BaseMessage>(json);
+    if (msg is UserInfoBaseMessage userInfo)
     {
-        nick = json.RootElement.GetProperty(nameof(UserInfoBaseMessage.Name)).GetString()!;
+        nick = userInfo!.Name;
     }
 
     sess.OnReceive -= GetName;

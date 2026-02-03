@@ -40,27 +40,4 @@ public class Encryption
         Assert.Equal(msg, new BytesContainer(decrypted));
         Assert.NotEqual(msg, new BytesContainer(encrypted));
     }
-
-    [Fact]
-    public void StreamEncryptionDecryption()
-    {
-        var aes = new BytesEncryption(Enumerable.Repeat((byte)1, 16).ToArray());
-        var msg = new BytesContainer("Hello world! Hello world! Hello world!");
-        
-        using var mem = new MemoryStream();
-        using var cryptostream = new CryptoStream(mem, aes.GetEncryptor(), CryptoStreamMode.Write);
-        cryptostream.Write(msg.GetBytes());
-        cryptostream.FlushFinalBlock();
-        mem.Seek(0, SeekOrigin.Begin);
-
-        using var decoderestream = new CryptoStream(mem, aes.GetDecryptor(), CryptoStreamMode.Read);
-        var buf = new byte[msg.GetBytes().Length];
-        var read = 0;
-        while(read < buf.Length)
-            read += decoderestream.Read(buf, read, buf.Length - read);
-        
-        var newmsg = new BytesContainer(buf);
-        
-        Assert.Equal(msg, newmsg);
-    }
 }

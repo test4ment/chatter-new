@@ -35,18 +35,6 @@ public class BytesEncryption(byte[] initKey)
         return aes.DecryptCbc(data, aes.IV);
     }
 
-    public ICryptoTransform GetEncryptor()
-    {
-        using var aes = InitAes();
-        return aes.CreateEncryptor();
-    }
-
-    public ICryptoTransform GetDecryptor()
-    {
-        using var aes = InitAes();
-        return aes.CreateDecryptor();
-    }
-
     private Aes InitAes()
     {
         var aes = Aes.Create();

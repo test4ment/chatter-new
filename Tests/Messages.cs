@@ -1,3 +1,4 @@
+using System.Text.Json;
 using chatter_new.Messaging;
 
 namespace chatter_new_tests;
@@ -9,9 +10,12 @@ public class MessagesTest
     {
         BaseMessage msg = new TextMessage("Hello world");
 
-        var ser = msg.Serialize();
+        // var ser = msg.Serialize();
+        var ser = JsonSerializer.Serialize(msg);
+        var deser = JsonSerializer.Deserialize<BaseMessage>(ser);
         
-        Assert.Equal("{\"Text\":\"Hello world\",\"Type\":\"TextMessage\"}", ser);
+        Assert.Equal(msg.GetType(), deser!.GetType());
+        Assert.Equal(msg, deser);
     }
 
     [Fact]
@@ -20,19 +24,19 @@ public class MessagesTest
         var msgTypes = new BaseMessage[]
         {
             new TextMessage("test"),
-            new SystemBaseMessage(SystemBaseMessage.SysMsgType.Joined),
+            new SystemMessage(SystemMessage.SysMsgType.Joined),
             new UserInfoBaseMessage("nickname")
         };
-        var msgNames = new string[]
+        var msgNames = new Type[]
         {
-            nameof(TextMessage),
-            nameof(SystemBaseMessage),
-            nameof(UserInfoBaseMessage),
+            typeof(TextMessage),
+            typeof(SystemMessage),
+            typeof(UserInfoBaseMessage),
         };
 
         foreach (var (msgType, msgName) in msgTypes.Zip(msgNames))
         {
-            Assert.Equal(msgType.Type, msgName);
+            Assert.Equal(msgType.GetType(), msgName);
         }
     }
 }
