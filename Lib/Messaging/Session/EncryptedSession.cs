@@ -11,9 +11,11 @@ public class EncryptedSession: ISession, IDisposable
     private BytesEncryption? encryption = null;
     private int leftToReceive = 0;
     private MessageMetadata? metadata = null;
+    private int Sent = 0;
     
     public event EventHandler<BaseMessage>? OnSend;
     public event EventHandler<BaseMessage>? OnReceive;
+    public event EventHandler<Progress>? OnMsgProgress;
     private EncryptedSession(IConnection connection)
     {
         this.connection = connection;
@@ -53,7 +55,12 @@ public class EncryptedSession: ISession, IDisposable
         var bytes = message.Serialize().Encode();
         var encryptbytes = encryption!.Encrypt(bytes);
         
-        var meta = new MessageMetadata(){ContentSize = encryptbytes.Length, TrackProgress = false}.Serialize();
+        var meta = new MessageMetadata()
+        {
+            ContentSize = encryptbytes.Length, 
+            TrackProgress = false,
+            Num = Sent++
+        }.Serialize();
         var metab = meta.Encode();
         var metaenc = encryption!.Encrypt(metab);
         
@@ -75,16 +82,27 @@ public class EncryptedSession: ISession, IDisposable
                     leftToReceive = buffer[..sizeof(int)].ToArray().DecodeInt();
                     buffer.RemoveRange(0, 4);
                 } else return;
-            
+
             if (buffer.Count < leftToReceive)
+            {
+                if(metadata is { TrackProgress: true }) UpdateProgress();         
                 return;
+            }
             
             if (metadata == null)
                 ProccessMeta();
             else {
+                if(metadata is { TrackProgress: true }) UpdateProgress();
                 ProccessMessage();
             }
         }
+    }
+
+    public void UpdateProgress()
+    {
+        OnMsgProgress?.Invoke(this, new Progress() {
+            Num = Sent, Current = buffer.Count, Total = leftToReceive
+        });
     }
 
     private void ProccessMeta()
