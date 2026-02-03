@@ -6,7 +6,6 @@ public class EncryptedSession: ISession, IDisposable
 {
     private readonly IConnection connection;
     private readonly List<byte> buffer = new List<byte>();
-    private byte[]? Key = null;
     private DHKeyExchange? keyExchange = null;
     private BytesEncryption? encryption = null;
     private int leftToReceive = 0;
@@ -41,11 +40,11 @@ public class EncryptedSession: ISession, IDisposable
             buffer.AddRange(connection.Receive());
         }
         
-        Key = keyExchange!.DerivePrivateKey(buffer.ToArray());
+        var key = keyExchange!.DerivePrivateKey(buffer.ToArray());
         buffer.Clear();
         keyExchange.Dispose();
         
-        encryption = new BytesEncryption(Key);
+        encryption = new BytesEncryption(key);
     }
     public void SendMessage(BaseMessage message)
     {
@@ -90,7 +89,6 @@ public class EncryptedSession: ISession, IDisposable
         if(connection is IDisposable disposable)
             disposable.Dispose();
         keyExchange?.Dispose();
-        Key = null;
         buffer.Clear();
     }
 }

@@ -49,12 +49,35 @@ sess.OnReceive += (sender, container) =>
 
     if (msg is SystemMessage smsg)
     {
-        if (smsg.SystemType == SystemMessage.SysMsgType.Left)
+        if (smsg.Type == SystemMessage.SysMsgType.Left)
         {
             Console.WriteLine($"{nick} has left. Exiting...");
             sess.Close();
             running = false;
         }
+    }
+
+    if (msg is BLOBMessage blob)
+    {
+        Console.WriteLine($"Got {blob.Filename} ({blob.Data.Length} bytes)");
+        var path = Path.GetFullPath(blob.Filename);
+        while (File.Exists(path))
+        {
+            var i = 1;
+            path = Path.GetFullPath(Path.GetFileNameWithoutExtension(blob.Filename) + $"-{i}" + Path.GetExtension(blob.Filename));
+            ++i;
+        }
+        Console.WriteLine($"Saving to {path} ({blob.Data.Length} bytes)");
+        try
+        {
+            File.WriteAllBytes(path, blob.Data);
+            Console.WriteLine($"Saved successfully");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Error: {e.Message}");
+        }
+        
     }
 };
 
@@ -64,7 +87,21 @@ while (running)
     if (Console.KeyAvailable)
     {
         var inp = Console.ReadLine();
-        if(!string.IsNullOrEmpty(inp))
+        if(inp?.StartsWith("/img") ?? false)
+        {
+            try
+            {
+                var path = inp.Split()[1];
+                var fname = Path.GetFileName(path);
+                var bytes = File.ReadAllBytes(path);
+                sess.SendMessage(new BLOBMessage(bytes, fname));
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Error: {e.Message}");
+            }
+        }
+        else if(!string.IsNullOrEmpty(inp))
             sess.SendMessage(new TextMessage(inp));
     }
 }

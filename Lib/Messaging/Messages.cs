@@ -6,6 +6,7 @@ namespace chatter_new.Messaging;
 [JsonDerivedType(typeof(TextMessage), "text")]
 [JsonDerivedType(typeof(UserInfoMessage), "userinfo")]
 [JsonDerivedType(typeof(SystemMessage), "system")]
+[JsonDerivedType(typeof(BLOBMessage), "blob")]
 public abstract class BaseMessage
 {
     public string Serialize()
@@ -31,11 +32,18 @@ public class UserInfoMessage(string name): BaseMessage
 [method: JsonConstructor]
 public class SystemMessage(SystemMessage.SysMsgType type): BaseMessage
 {
-    public SysMsgType SystemType { get; init; } = type;
+    public SysMsgType Type { get; init; } = type;
 
     public enum SysMsgType
     {
         Joined,
         Left
     }
+}
+
+[method: JsonConstructor]
+public class BLOBMessage(byte[] data, string filename) : BaseMessage
+{
+    public byte[] Data { get; init; } = data;
+    public string Filename { get; init; } = filename;
 }
