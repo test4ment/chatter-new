@@ -1,20 +1,22 @@
+using chatter_new.Messaging.Messages;
+
 namespace chatter_new.Messaging.Session;
 
-public class UnencryptedSession : ISession, IDisposable
+public class Session : ISession, IDisposable
 {
     public const byte EOT = 0x03;
     private readonly List<byte> buffer = new List<byte>();
     private readonly IConnection connection;
-    private UnencryptedSession(IConnection connection)
+    private Session(IConnection connection)
     {
         this.connection = connection;
     }
     public event EventHandler<BaseMessage>? OnSend;
     public event EventHandler<string>? OnReceive;
     
-    public static UnencryptedSession CreateSession(string name, IConnection connection)
+    public static Session CreateSession(string name, IConnection connection)
     {
-        var session = new UnencryptedSession(connection);
+        var session = new Session(connection);
         session.SendMessage(new UserInfoMessage(name));
         
         return session;

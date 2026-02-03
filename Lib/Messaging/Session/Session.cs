@@ -1,3 +1,5 @@
+using chatter_new.Messaging.Messages;
+
 namespace chatter_new.Messaging.Session;
 
 public interface ISession

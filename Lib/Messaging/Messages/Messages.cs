@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace chatter_new.Messaging;
+namespace chatter_new.Messaging.Messages;
 
 [JsonDerivedType(typeof(TextMessage), "text")]
 [JsonDerivedType(typeof(UserInfoMessage), "userinfo")]
@@ -14,7 +14,10 @@ public abstract class BaseMessage
         return JsonSerializer.Serialize<BaseMessage>(this, Default);
     }
 
-    protected static JsonSerializerOptions Default = new JsonSerializerOptions() { IncludeFields = true };
+    protected static JsonSerializerOptions Default = new JsonSerializerOptions()
+    {
+        IncludeFields = true
+    };
 }
 
 [method: JsonConstructor]

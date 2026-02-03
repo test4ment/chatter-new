@@ -1,20 +1,13 @@
 using System.Net;
-using System.Net.Sockets;
 using System.Text.Json;
 using chatter_new.Messaging;
+using chatter_new.Messaging.Messages;
 using chatter_new.Messaging.Session;
 
 namespace chatter_new_tests;
 
-public class UnencryptedSessionTest
+public class SessionTest
 {
-    [Fact]
-    public void TestTalk()
-    {
-        // var sess1 = UnencryptedSession.CreateSession("a", SocketConnection.ListenAndAwaitClient());
-        // var sess2 = UnencryptedSession.CreateSession();
-    }
-
     [Fact]
     public void EncryptedSessionTest()
     {

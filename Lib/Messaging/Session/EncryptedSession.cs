@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using chatter_new.Messaging.Messages;
 
 namespace chatter_new.Messaging.Session;
 
@@ -50,9 +51,18 @@ public class EncryptedSession: ISession, IDisposable
     {
         var bytes = new BytesContainer(message.Serialize()).GetBytes();
         var encryptbytes = encryption!.Encrypt(bytes);
-        var len = new byte[4]; BinaryPrimitives.WriteInt32BigEndian(len, encryptbytes.Length);
-        connection.Send(len.Concat(encryptbytes).ToArray());
+        
+        SendSize(bytes.Length);
+        connection.Send(encryptbytes);
+        
         OnSend?.Invoke(this, message);
+    }
+
+    private void SendSize(int size)
+    {
+        var len = new byte[4]; 
+        BinaryPrimitives.WriteInt32BigEndian(len, size);
+        connection.Send(len);
     }
 
     public void CheckForIncoming()

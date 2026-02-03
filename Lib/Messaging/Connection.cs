@@ -12,7 +12,7 @@ public interface IConnection
 
 public class SocketConnection(Socket sock) : IConnection, IDisposable
 {
-    private byte[] buffer = new byte[1024 * 4];
+    private readonly byte[] buffer = new byte[1024 * 4];
     public void Send(byte[] data)
     {
         sock.Send(data);
