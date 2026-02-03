@@ -6,37 +6,37 @@ namespace chatter_new_tests;
 public class MessagesTest
 {
     [Fact]
-    public void MessageSerialize()
+    public void MessageRoundtrip()
     {
         BaseMessage msg = new TextMessage("Hello world");
 
-        // var ser = msg.Serialize();
-        var ser = JsonSerializer.Serialize(msg);
+        var ser = msg.Serialize();
         var deser = JsonSerializer.Deserialize<BaseMessage>(ser);
         
         Assert.Equal(msg.GetType(), deser!.GetType());
-        Assert.Equal(msg, deser);
+        Assert.True(deser is TextMessage);
+        Assert.Equal(((TextMessage)msg).Text, ((TextMessage)deser).Text);
     }
 
     [Fact]
-    public void MessageNaming()
+    public void MessageTypePreserve()
     {
         var msgTypes = new BaseMessage[]
         {
             new TextMessage("test"),
             new SystemMessage(SystemMessage.SysMsgType.Joined),
-            new UserInfoBaseMessage("nickname")
+            new UserInfoMessage("nickname")
         };
         var msgNames = new Type[]
         {
             typeof(TextMessage),
             typeof(SystemMessage),
-            typeof(UserInfoBaseMessage),
+            typeof(UserInfoMessage),
         };
 
-        foreach (var (msgType, msgName) in msgTypes.Zip(msgNames))
+        foreach (var (msgInstance, msgType) in msgTypes.Zip(msgNames))
         {
-            Assert.Equal(msgType.GetType(), msgName);
+            Assert.True(msgInstance.GetType() == msgType);
         }
     }
 }

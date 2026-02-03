@@ -3,14 +3,14 @@ using System.Text.Json.Serialization;
 
 namespace chatter_new.Messaging;
 
-[JsonDerivedType(typeof(TextMessage))]
-[JsonDerivedType(typeof(UserInfoBaseMessage))]
-[JsonDerivedType(typeof(SystemMessage))]
+[JsonDerivedType(typeof(TextMessage), "text")]
+[JsonDerivedType(typeof(UserInfoMessage), "userinfo")]
+[JsonDerivedType(typeof(SystemMessage), "system")]
 public abstract class BaseMessage
 {
     public string Serialize()
     {
-        return JsonSerializer.Serialize(this, this.GetType());
+        return JsonSerializer.Serialize<BaseMessage>(this, Default);
     }
 
     protected static JsonSerializerOptions Default = new JsonSerializerOptions() { IncludeFields = true };
@@ -23,7 +23,7 @@ public class TextMessage(string text): BaseMessage
 }
 
 [method: JsonConstructor]
-public class UserInfoBaseMessage(string name): BaseMessage
+public class UserInfoMessage(string name): BaseMessage
 {
     public string Name { get; init; } = name;
 }

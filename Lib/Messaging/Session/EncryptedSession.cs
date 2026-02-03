@@ -25,7 +25,7 @@ public class EncryptedSession: ISession, IDisposable
         session.SendHandshake();
         session.AwaitHandshake();
         
-        session.SendMessage(new UserInfoBaseMessage(name));
+        session.SendMessage(new UserInfoMessage(name));
 
         return session;
     }

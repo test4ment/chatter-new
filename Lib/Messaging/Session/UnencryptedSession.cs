@@ -15,7 +15,7 @@ public class UnencryptedSession : ISession, IDisposable
     public static UnencryptedSession CreateSession(string name, IConnection connection)
     {
         var session = new UnencryptedSession(connection);
-        session.SendMessage(new UserInfoBaseMessage(name));
+        session.SendMessage(new UserInfoMessage(name));
         
         return session;
     }

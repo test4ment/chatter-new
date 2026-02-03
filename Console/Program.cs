@@ -72,7 +72,7 @@ while (running)
 void GetName(object? sender, string json)
 {
     var msg = JsonSerializer.Deserialize<BaseMessage>(json);
-    if (msg is UserInfoBaseMessage userInfo)
+    if (msg is UserInfoMessage userInfo)
     {
         nick = userInfo!.Name;
     }
