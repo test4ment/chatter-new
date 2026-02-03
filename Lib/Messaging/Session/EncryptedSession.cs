@@ -58,7 +58,7 @@ public class EncryptedSession: ISession, IDisposable
         var meta = new MessageMetadata()
         {
             ContentSize = encryptbytes.Length, 
-            TrackProgress = false,
+            TrackProgress = encryptbytes.Length >= 128 * 1024,
             Num = Sent++
         }.Serialize();
         var metab = meta.Encode();
@@ -101,7 +101,7 @@ public class EncryptedSession: ISession, IDisposable
     public void UpdateProgress()
     {
         OnMsgProgress?.Invoke(this, new Progress() {
-            Num = Sent, Current = buffer.Count, Total = leftToReceive
+            Num = Sent, Current = buffer.Count, Total = metadata!.ContentSize
         });
     }
 

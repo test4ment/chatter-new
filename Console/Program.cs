@@ -66,7 +66,7 @@ sess.OnReceive += (sender, msg) =>
             path = Path.GetFullPath(Path.GetFileNameWithoutExtension(blob.Filename) + $"-{i}" + Path.GetExtension(blob.Filename));
             ++i;
         }
-        Console.WriteLine($"Saving to {path} ({blob.Data.Length} bytes)");
+        Console.WriteLine($"Saving to {path}");
         try
         {
             File.WriteAllBytes(path, blob.Data);
@@ -80,6 +80,25 @@ sess.OnReceive += (sender, msg) =>
     }
 };
 
+int downloaded = 0;
+var started = DateTime.Now;
+sess.OnMsgProgress += (sender, progress) =>
+{
+    if(downloaded == 0)
+        started = DateTime.Now;
+    downloaded = progress.Current;
+    Console.Write("\r");
+    if (progress.Current < progress.Total)
+    {
+        Console.Write(
+            $"Downloading blob {progress.Current / (float)progress.Total:P} ({downloaded / 1024f / ((DateTime.Now - started).Seconds + 1)} KiB/s)" + ' ' * 10);
+    }
+    else
+    {
+        downloaded = 0;
+        Console.WriteLine("Finished!");
+    }
+};
 while (running)
 {
     sess.CheckForIncoming();
