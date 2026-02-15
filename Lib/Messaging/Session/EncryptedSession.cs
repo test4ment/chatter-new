@@ -11,7 +11,7 @@ public class EncryptedSession: ISession, IDisposable
     private BytesEncryption? encryption = null;
     private int leftToReceive = 0;
     private MessageMetadata? metadata = null;
-    private int Sent = 0;
+    private int sent = 0;
     
     public event EventHandler<BaseMessage>? OnSend;
     public event EventHandler<BaseMessage>? OnReceive;
@@ -59,7 +59,7 @@ public class EncryptedSession: ISession, IDisposable
         {
             ContentSize = encryptbytes.Length, 
             TrackProgress = encryptbytes.Length >= 128 * 1024,
-            Num = Sent++
+            Num = sent++
         }.Serialize();
         var metab = meta.Encode();
         var metaenc = encryption!.Encrypt(metab);
@@ -77,10 +77,10 @@ public class EncryptedSession: ISession, IDisposable
         while(true)
         {
             if (leftToReceive == 0)
-                if (buffer.Count >= 4)
+                if (buffer.Count >= sizeof(int))
                 {
                     leftToReceive = buffer[..sizeof(int)].ToArray().DecodeInt();
-                    buffer.RemoveRange(0, 4);
+                    buffer.RemoveRange(0, sizeof(int));
                 } else return;
 
             if (buffer.Count < leftToReceive)
@@ -98,10 +98,10 @@ public class EncryptedSession: ISession, IDisposable
         }
     }
 
-    public void UpdateProgress()
+    private void UpdateProgress()
     {
         OnMsgProgress?.Invoke(this, new Progress() {
-            Num = Sent, Current = buffer.Count, Total = metadata!.ContentSize
+            Num = sent, Current = buffer.Count, Total = metadata!.ContentSize
         });
     }
 
