@@ -43,6 +43,20 @@ public class SocketConnection(Socket sock) : IConnection, IDisposable
         sock.Listen(1);
         return new SocketConnection(sock.Accept());
     }
+    public static IEnumerable<SocketConnection> ListenAndAwaitClients(IPEndPoint address, int backlog, TimeSpan timeout)
+    {
+        using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        sock.Bind(address);
+        sock.Listen(backlog);
+        var connections = new List<SocketConnection>();
+        var waitUntil = DateTime.Now.Add(timeout);
+        while (connections.Count < backlog && DateTime.Now < waitUntil) {
+            if (sock.Poll(waitUntil - DateTime.Now, SelectMode.SelectRead)) {
+                connections.Add(new SocketConnection(sock.Accept()));
+            }    
+        }
+        return connections;
+    }
 
     public static SocketConnection TryAwaitClient(IPEndPoint address)
     {

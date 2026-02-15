@@ -61,4 +61,69 @@ public class ConnectionTest
         Assert.Equal(clientname, received_client);
         Assert.Equal(servername, received_server);
     }
+
+    [Fact]
+    public void MultipleConnections()
+    {
+        var addr = new IPEndPoint(IPAddress.Loopback, 50003);
+        var serverConnections = new List<SocketConnection>();
+        var t = new Thread(o =>
+        {
+            while (serverConnections.Count < 3)
+                serverConnections.Add(SocketConnection.ListenAndAwaitClient(addr));
+        });
+        t.Start();
+        using var client1 = SocketConnection.ConnectTo(addr);
+        using var client2 = SocketConnection.ConnectTo(addr);
+        using var client3 = SocketConnection.ConnectTo(addr);
+        t.Join();
+        
+        Assert.Equal(3, serverConnections.Count);
+        
+        client1.Send("c1".Encode());
+        client2.Send("c2".Encode());
+        client3.Send("c3".Encode());
+
+        foreach (var client in serverConnections)
+        {
+            var recv = client.Receive().Decode();
+            client.Send($"Hi {recv}!".Encode());
+        }
+        
+        Assert.Equal("Hi c1!", client1.Receive().Decode());
+        Assert.Equal("Hi c2!", client2.Receive().Decode());
+        Assert.Equal("Hi c3!", client3.Receive().Decode());
+    }
+    
+    [Fact]
+    public void MultipleConnectionsMethod()
+    {
+        var addr = new IPEndPoint(IPAddress.Loopback, 50004);
+        List<SocketConnection> serverConnections = null!;
+        var t = new Thread(o =>
+        {
+            serverConnections = new List<SocketConnection>(SocketConnection.ListenAndAwaitClients(addr, 3, TimeSpan.FromSeconds(5)));
+        });
+        t.Start();
+        using var client1 = SocketConnection.ConnectTo(addr);
+        using var client2 = SocketConnection.ConnectTo(addr);
+        using var client3 = SocketConnection.ConnectTo(addr);
+        t.Join();
+        
+        Assert.Equal(3, serverConnections.Count);
+        
+        client1.Send("c1".Encode());
+        client2.Send("c2".Encode());
+        client3.Send("c3".Encode());
+
+        foreach (var connectedClient in serverConnections)
+        {
+            var recv = connectedClient.Receive().Decode();
+            connectedClient.Send($"Hi {recv}!".Encode());
+        }
+        
+        Assert.Equal("Hi c1!", client1.Receive().Decode());
+        Assert.Equal("Hi c2!", client2.Receive().Decode());
+        Assert.Equal("Hi c3!", client3.Receive().Decode());
+    }
 }
