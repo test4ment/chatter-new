@@ -102,7 +102,8 @@ public class ConnectionTest
         List<SocketConnection> serverConnections = null!;
         var t = new Thread(o =>
         {
-            serverConnections = new List<SocketConnection>(SocketConnection.ListenAndAwaitClients(addr, 3, TimeSpan.FromSeconds(5)));
+            serverConnections = new List<SocketConnection>(
+                SocketConnection.ListenAndAwaitClients(addr, TimeSpan.FromSeconds(5)));
         });
         t.Start();
         using var client1 = SocketConnection.ConnectTo(addr);
