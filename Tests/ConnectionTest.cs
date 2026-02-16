@@ -12,14 +12,14 @@ public class ConnectionTest
     {
         using var sock_client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         using var sock_server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        var addr = new IPEndPoint(IPAddress.Loopback, 0);
+        var addr = new IPEndPoint(IPAddress.Loopback, 50030);
         
         sock_server.Bind(addr);
         sock_server.Listen(1);
         sock_client.Connect(sock_server.LocalEndPoint!);
-        var client = new SocketConnection(sock_client);
+        using var client = new SocketConnection(sock_client);
         using var client_remote = sock_server.Accept();
-        var server = new SocketConnection(client_remote); 
+        using var server = new SocketConnection(client_remote); 
 
         const string msg = "Hello server!";
         const string msg_response = "Ack! Hello client!";
@@ -36,7 +36,7 @@ public class ConnectionTest
     [Fact]
     public void ClientNameExchange()
     {
-        var addr = new IPEndPoint(IPAddress.Loopback, 50002);
+        var addr = new IPEndPoint(IPAddress.Loopback, 50040);
         SocketConnection server = null!;
         var t = new Thread(o => server = SocketConnection.ListenAndAwaitClient(addr));
         t.Start();
@@ -65,7 +65,7 @@ public class ConnectionTest
     [Fact]
     public void MultipleConnections()
     {
-        var addr = new IPEndPoint(IPAddress.Loopback, 50003);
+        var addr = new IPEndPoint(IPAddress.Loopback, 50050);
         var serverConnections = new List<SocketConnection>();
         var t = new Thread(o =>
         {
@@ -98,7 +98,7 @@ public class ConnectionTest
     [Fact]
     public void MultipleConnectionsMethod()
     {
-        var addr = new IPEndPoint(IPAddress.Loopback, 50004);
+        var addr = new IPEndPoint(IPAddress.Loopback, 50060);
         List<SocketConnection> serverConnections = null!;
         var t = new Thread(o =>
         {

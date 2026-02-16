@@ -14,10 +14,7 @@ public class SocketConnection(Socket sock) : IConnection, IDisposable
     public const int KiB = 1024;
     public const int MiB = KiB * KiB;
     private readonly byte[] buffer = new byte[2 * MiB];
-    public void Send(byte[] data)
-    {
-        sock.Send(data);
-    }
+    public void Send(byte[] data) => sock.Send(data);
 
     public byte[] Receive()
     {

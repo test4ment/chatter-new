@@ -47,6 +47,7 @@ public class EncryptedSession: ISession, IDisposable
         var key = keyExchange!.DerivePrivateKey(buffer.ToArray());
         buffer.Clear();
         keyExchange.Dispose();
+        keyExchange = null;
         
         encryption = new BytesEncryption(key);
     }

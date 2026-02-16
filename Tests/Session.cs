@@ -11,13 +11,13 @@ public class SessionTest
     [Fact]
     public void UnencryptedSessionTest()
     {
-        var addr = new IPEndPoint(IPAddress.Loopback, 50002);
+        var addr = new IPEndPoint(IPAddress.Loopback, 50000);
         Session sess1 = null!;
         var t = new Thread(() => 
             sess1 = Session.CreateSession(
                 "foo", SocketConnection.ListenAndAwaitClient(addr)));
         t.Start();
-        var sess2 = Session.CreateSession("bar", SocketConnection.ConnectTo(addr));
+        using var sess2 = Session.CreateSession("bar", SocketConnection.ConnectTo(addr));
         t.Join();
         
         sess1.CheckForIncoming();
@@ -37,18 +37,20 @@ public class SessionTest
         sess2.CheckForIncoming();
         
         Assert.Equal(3, called);
+        
+        sess1.Dispose();
     }
     
     [Fact]
     public void EncryptedSessionTest()
     {
-        var addr = new IPEndPoint(IPAddress.Loopback, 50001);
+        var addr = new IPEndPoint(IPAddress.Loopback, 50010);
         EncryptedSession sess1 = null!;
         var t = new Thread(() => 
             sess1 = EncryptedSession.Create(
                 SocketConnection.ListenAndAwaitClient(addr), "foo"));
         t.Start();
-        var sess2 = EncryptedSession.Create(SocketConnection.ConnectTo(addr), "bar");
+        using var sess2 = EncryptedSession.Create(SocketConnection.ConnectTo(addr), "bar");
         t.Join();
         
         sess1.CheckForIncoming();
@@ -68,5 +70,7 @@ public class SessionTest
         sess2.CheckForIncoming();
         
         Assert.Equal(3, called);
+        
+        sess1.Dispose();
     }
 }
