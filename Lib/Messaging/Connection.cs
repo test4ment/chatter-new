@@ -26,9 +26,9 @@ public class SocketConnection(Socket sock) : IConnection, IDisposable
         return Array.Empty<byte>();
     }
 
-    public static SocketConnection ConnectTo(IPEndPoint address)
+    public static SocketConnection ConnectTo(IPEndPoint address, int timeoutMs = 0)
     {
-        var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp){SendTimeout = timeoutMs};
         sock.Connect(address);
         return new SocketConnection(sock);
     }
