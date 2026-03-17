@@ -31,7 +31,7 @@ Console.CancelKeyPress += (_, __) =>
 {
     Console.WriteLine("Exiting...");
     sess.SendMessage(new SystemMessage(SystemMessage.SysMsgType.Left));
-    sess.Close();
+    sess.Dispose();
     running = false;
 };
 
@@ -51,7 +51,7 @@ sess.OnReceive += (sender, msg) =>
         if (smsg.Type == SystemMessage.SysMsgType.Left)
         {
             Console.WriteLine($"{nick} has left. Exiting...");
-            sess.Close();
+            sess.Dispose();
             running = false;
         }
     }

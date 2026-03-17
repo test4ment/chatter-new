@@ -12,6 +12,7 @@ public class EncryptedSession: ISession, IDisposable
     private int leftToReceive = 0;
     private MessageMetadata? metadata = null;
     private int sent = 0;
+    public bool IsDisposed { get; private set; } = false;
     
     public event EventHandler<BaseMessage>? OnSend;
     public event EventHandler<BaseMessage>? OnReceive;
@@ -128,14 +129,9 @@ public class EncryptedSession: ISession, IDisposable
         return msgb;
     }
     
-    public void Close()
-    {
-        CheckForIncoming();
-        if(connection is IDisposable disposable)
-            disposable.Dispose();
-    }
     public void Dispose()
     {
+        IsDisposed = true;
         if(connection is IDisposable disposable)
             disposable.Dispose();
         keyExchange?.Dispose();
