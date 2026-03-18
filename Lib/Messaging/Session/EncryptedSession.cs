@@ -6,8 +6,8 @@ namespace chatter_new.Messaging.Session;
 public class EncryptedSession: ISession, IDisposable
 {
     private readonly IConnection connection;
-    private readonly List<byte> buffer = new List<byte>();
-    private DHKeyExchange? keyExchange = null;
+    private readonly List<byte> buffer = new List<byte>(); // TODO: use IO.Pipelines
+    private DHKeyExchange? keyExchange = null; // TODO: key cycling
     private BytesEncryption? encryption = null;
     private int leftToReceive = 0;
     private MessageMetadata? metadata = null;
@@ -22,7 +22,7 @@ public class EncryptedSession: ISession, IDisposable
         this.connection = connection;
     }
 
-    public static EncryptedSession Create(IConnection connection, string name)
+    public static EncryptedSession Create(IConnection connection, string name) // TODO: Async
     {
         var session = new EncryptedSession(connection);
         
@@ -60,7 +60,7 @@ public class EncryptedSession: ISession, IDisposable
         var meta = new MessageMetadata()
         {
             ContentSize = encryptbytes.Length, 
-            TrackProgress = encryptbytes.Length >= 128 * 1024,
+            TrackProgress = encryptbytes.Length >= 128 * 1024, // TODO: big messages or files
             Num = sent++
         }.Serialize();
         var metab = meta.Encode();

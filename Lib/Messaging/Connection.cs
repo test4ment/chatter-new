@@ -40,7 +40,7 @@ public class SocketConnection(Socket sock) : IConnection, IDisposable
         sock.Listen(1);
         return new SocketConnection(sock.Accept());
     }
-    public static IEnumerable<SocketConnection> ListenAndAwaitClients(IPEndPoint address, TimeSpan timeout)
+    public static IEnumerable<SocketConnection> ListenAndAwaitClients(IPEndPoint address, TimeSpan timeout) // TODO: Async
     {
         using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         sock.Bind(address);
