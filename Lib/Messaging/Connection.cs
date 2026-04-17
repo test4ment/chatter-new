@@ -1,30 +1,41 @@
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
+using static chatter_new.Messaging.IConnection; 
 
 namespace chatter_new.Messaging;
 
 public interface IConnection
 {
-    public void Send(byte[] data);
-    public byte[] Receive();
+    public int Available { get; }
+    public void Send(byte[] data); // TODO: return sent bytes count
+    public void Send(byte[] data, int offset, int length);
+    public int Receive(byte[] buffer);
+    public int Receive(byte[] buffer, int offset, int count);
 }
 
-public class SocketConnection(Socket sock) : IConnection, IDisposable
+public interface IConnectionAsync: IConnection
 {
-    public const int KiB = 1024;
-    public const int MiB = KiB * KiB;
-    private readonly byte[] buffer = new byte[2 * MiB];
-    public void Send(byte[] data) => sock.Send(data);
+    public Task SendAsync(byte[] data);
+    public Task SendAsync(byte[] data, int offset, int length);
+    public Task<int> ReceiveAsync(byte[] buffer);
+}
 
-    public byte[] Receive()
-    {
-        if (sock.Available > 0)
-        {
-            var size = sock.Receive(buffer);
-            return buffer[..size];
-        }
-        return Array.Empty<byte>();
-    }
+public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDisposable
+{
+    public int Available => sock.Available;
+    public void Send(byte[] data) => sock.Send(data);
+    public void Send(byte[] data, int offset, int length) 
+        => sock.Send(data, offset, length, SocketFlags.None);
+    public int Receive(byte[] buffer) 
+        => Available > 0 ? sock.Receive(buffer) : 0;
+
+    public int Receive(byte[] buffer, int offset, int count) 
+        => Available > 0 ? sock.Receive(buffer, offset, count, SocketFlags.None) : 0;
+
+    public async Task SendAsync(byte[] data) => await sock.SendAsync(data);
+    public async Task SendAsync(byte[] data, int offset, int length) => await sock.SendAsync(data[offset..(offset + length)]);
+    public async Task<int> ReceiveAsync(byte[] buffer) => await sock.ReceiveAsync(buffer);
 
     public static SocketConnection ConnectTo(IPEndPoint address, int timeoutMs = 0)
     {
@@ -32,15 +43,14 @@ public class SocketConnection(Socket sock) : IConnection, IDisposable
         sock.Connect(address);
         return new SocketConnection(sock);
     }
-
-    public static SocketConnection ListenAndAwaitClient(IPEndPoint address)
+    public static async Task<SocketConnection> ListenAndAwaitClient(IPEndPoint address)
     {
         using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         sock.Bind(address);
         sock.Listen(1);
-        return new SocketConnection(sock.Accept());
+        return new SocketConnection(await sock.AcceptAsync());
     }
-    public static IEnumerable<SocketConnection> ListenAndAwaitClients(IPEndPoint address, TimeSpan timeout) // TODO: Async
+    public static async Task<IEnumerable<SocketConnection>> ListenAndAwaitClients(IPEndPoint address, TimeSpan timeout) // TODO: Async
     {
         using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         sock.Bind(address);
@@ -49,12 +59,11 @@ public class SocketConnection(Socket sock) : IConnection, IDisposable
         var waitUntil = DateTime.Now.Add(timeout);
         while (DateTime.Now < waitUntil) {
             if (sock.Poll(waitUntil - DateTime.Now, SelectMode.SelectRead)) {
-                connections.Add(new SocketConnection(sock.Accept()));
+                connections.Add(new SocketConnection(await sock.AcceptAsync()));
             }    
         }
         return connections;
     }
-
     public static SocketConnection TryAwaitClient(IPEndPoint address)
     {
         throw new NotImplementedException();
@@ -62,6 +71,7 @@ public class SocketConnection(Socket sock) : IConnection, IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         sock.Dispose();
     }
 }

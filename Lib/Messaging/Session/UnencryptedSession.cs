@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text.Json;
 using chatter_new.Messaging.Messages;
 
@@ -35,7 +36,10 @@ public class Session : ISession, IDisposable
 
     public void CheckForIncoming()
     {
-        buffer.AddRange(connection.Receive());
+        var buf = ArrayPool<byte>.Shared.Rent(connection.Available);
+        var recv = connection.Receive(buf);
+        buffer.AddRange(buf[..recv]);
+        ArrayPool<byte>.Shared.Return(buf);
 
         while (true)
         {

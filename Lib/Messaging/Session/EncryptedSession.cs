@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text.Json;
 using chatter_new.Messaging.Messages;
 
@@ -5,7 +6,7 @@ namespace chatter_new.Messaging.Session;
 
 public class EncryptedSession: ISession, IDisposable
 {
-    private readonly IConnection connection;
+    private readonly IConnectionAsync connection;
     private readonly List<byte> buffer = new List<byte>(); // TODO: use IO.Pipelines
     private DHKeyExchange? keyExchange = null; // TODO: key cycling
     private BytesEncryption? encryption = null;
@@ -17,20 +18,18 @@ public class EncryptedSession: ISession, IDisposable
     public event EventHandler<BaseMessage>? OnSend;
     public event EventHandler<BaseMessage>? OnReceive;
     public event EventHandler<Progress>? OnMsgProgress;
-    private EncryptedSession(IConnection connection)
+    private EncryptedSession(IConnectionAsync connection)
     {
         this.connection = connection;
     }
 
-    public static EncryptedSession Create(IConnection connection, string name) // TODO: Async
+    public static async Task<EncryptedSession> Create(IConnectionAsync connection) // TODO: Async
     {
         var session = new EncryptedSession(connection);
         
         session.SendHandshake();
-        session.AwaitHandshake();
+        await session.AwaitHandshake();
         
-        session.SendMessage(new UserInfoMessage(name));
-
         return session;
     }
     private void SendHandshake()
@@ -38,15 +37,19 @@ public class EncryptedSession: ISession, IDisposable
         keyExchange = new DHKeyExchange();
         connection.Send(keyExchange.PublicKey);
     }
-    private void AwaitHandshake()
+    private async Task AwaitHandshake()
     {
-        while(buffer.Count < keyExchange!.PublicKey.Length)
+        var len = keyExchange!.PublicKey.Length;
+        var keyBuf = ArrayPool<byte>.Shared.Rent(len);
+        var recv = 0;
+        while ((recv += await connection.ReceiveAsync(keyBuf)) < len)
         {
-            buffer.AddRange(connection.Receive());
+            await Task.Delay(1);
         }
         
-        var key = keyExchange!.DerivePrivateKey(buffer.ToArray());
-        buffer.Clear();
+        var key = keyExchange!.DerivePrivateKey(keyBuf[..len]);
+        ArrayPool<byte>.Shared.Return(keyBuf);
+        
         keyExchange.Dispose();
         keyExchange = null;
         
@@ -75,7 +78,11 @@ public class EncryptedSession: ISession, IDisposable
 
     public void CheckForIncoming()
     {
-        buffer.AddRange(connection.Receive());
+        var buf = ArrayPool<byte>.Shared.Rent(connection.Available);
+        var recv = connection.Receive(buf); // blocks
+        buffer.AddRange(buf[..recv]);
+        ArrayPool<byte>.Shared.Return(buf);
+        
         while(true)
         {
             if (leftToReceive == 0)

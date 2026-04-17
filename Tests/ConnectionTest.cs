@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -10,17 +11,8 @@ public class ConnectionTest
     [Fact]
     public void ClientsTalk()
     {
-        using var sock_client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        using var sock_server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        var addr = new IPEndPoint(IPAddress.Loopback, 50030);
+        var (client, server) = InMemoryConnection.CreatePair();
         
-        sock_server.Bind(addr);
-        sock_server.Listen(1);
-        sock_client.Connect(sock_server.LocalEndPoint!);
-        using var client = new SocketConnection(sock_client);
-        using var client_remote = sock_server.Accept();
-        using var server = new SocketConnection(client_remote); 
-
         const string msg = "Hello server!";
         const string msg_response = "Ack! Hello client!";
         
@@ -36,26 +28,19 @@ public class ConnectionTest
     [Fact]
     public void ClientNameExchange()
     {
-        var addr = new IPEndPoint(IPAddress.Loopback, 50040);
-        SocketConnection server = null!;
-        var t = new Thread(o => server = SocketConnection.ListenAndAwaitClient(addr));
-        t.Start();
-        using var client = SocketConnection.ConnectTo(addr);
-        t.Join();
+        var (client, server) = InMemoryConnection.CreatePair();
         
         var clientname = "Alice";
         var servername = "Bob";
         
         client.Send(clientname.Encode());
         var data = server!.Receive();
-        while (data.Length == 0)
-            data = server.Receive();
+        
         var received_client = data.Decode();
         
         server.Send(servername.Encode());
         data = client.Receive();
-        while (data.Length == 0)
-            data = server.Receive();
+        
         var received_server = data.Decode();
         
         Assert.Equal(clientname, received_client);
@@ -65,18 +50,11 @@ public class ConnectionTest
     [Fact]
     public void MultipleConnections()
     {
-        var addr = new IPEndPoint(IPAddress.Loopback, 50050);
-        var serverConnections = new List<SocketConnection>();
-        var t = new Thread(o =>
-        {
-            while (serverConnections.Count < 3)
-                serverConnections.Add(SocketConnection.ListenAndAwaitClient(addr));
-        });
-        t.Start();
-        using var client1 = SocketConnection.ConnectTo(addr);
-        using var client2 = SocketConnection.ConnectTo(addr);
-        using var client3 = SocketConnection.ConnectTo(addr);
-        t.Join();
+        var (client1, server1) = InMemoryConnection.CreatePair();
+        var (client2, server2) = InMemoryConnection.CreatePair();
+        var (client3, server3) = InMemoryConnection.CreatePair();
+        var serverConnections = new List<IConnection>{ server1, server2, server3 };
+        
         
         Assert.Equal(3, serverConnections.Count);
         
@@ -86,8 +64,13 @@ public class ConnectionTest
 
         foreach (var client in serverConnections)
         {
-            var recv = client.Receive().Decode();
+            var buf = ArrayPool<byte>.Shared.Rent(client.Available);
+            
+            var recvbytes = client.Receive(buf); 
+            var recv = buf[..recvbytes].Decode();
             client.Send($"Hi {recv}!".Encode());
+            
+            ArrayPool<byte>.Shared.Return(buf);
         }
         
         Assert.Equal("Hi c1!", client1.Receive().Decode());
@@ -98,18 +81,10 @@ public class ConnectionTest
     [Fact]
     public void MultipleConnectionsMethod()
     {
-        var addr = new IPEndPoint(IPAddress.Loopback, 50060);
-        List<SocketConnection> serverConnections = null!;
-        var t = new Thread(o =>
-        {
-            serverConnections = new List<SocketConnection>(
-                SocketConnection.ListenAndAwaitClients(addr, TimeSpan.FromSeconds(5)));
-        });
-        t.Start();
-        using var client1 = SocketConnection.ConnectTo(addr);
-        using var client2 = SocketConnection.ConnectTo(addr);
-        using var client3 = SocketConnection.ConnectTo(addr);
-        t.Join();
+        var (client1, server1) = InMemoryConnection.CreatePair();
+        var (client2, server2) = InMemoryConnection.CreatePair();
+        var (client3, server3) = InMemoryConnection.CreatePair();
+        var serverConnections = new List<IConnection>{ server1, server2, server3 };
         
         Assert.Equal(3, serverConnections.Count);
         
@@ -119,8 +94,13 @@ public class ConnectionTest
 
         foreach (var connectedClient in serverConnections)
         {
-            var recv = connectedClient.Receive().Decode();
+            var buf = ArrayPool<byte>.Shared.Rent(connectedClient.Available);
+            
+            var recvbytes = connectedClient.Receive(buf); 
+            var recv = buf[..recvbytes].Decode();
             connectedClient.Send($"Hi {recv}!".Encode());
+            
+            ArrayPool<byte>.Shared.Return(buf);
         }
         
         Assert.Equal("Hi c1!", client1.Receive().Decode());

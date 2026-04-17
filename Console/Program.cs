@@ -7,7 +7,6 @@ using chatter_new.Messaging.Session;
 Console.InputEncoding = Encoding.Unicode;
 Console.OutputEncoding = Encoding.Unicode;
 
-
 Console.WriteLine("Hello, World!");
 
 var ip = new IPEndPoint(IPAddress.Loopback, 50001);
@@ -16,13 +15,15 @@ EncryptedSession sess;
 if (Console.ReadKey(true).Key == ConsoleKey.C )
 {
     Console.WriteLine("Connect mode");
-    sess = EncryptedSession.Create(SocketConnection.ConnectTo(ip), "foo");
+    sess = await EncryptedSession.Create(SocketConnection.ConnectTo(ip));
+    sess.SendMessage(new UserInfoMessage("connector"));
     Console.WriteLine("Connected");
 }
 else
 {
     Console.WriteLine("Await mode");
-    sess = EncryptedSession.Create(SocketConnection.ListenAndAwaitClient(ip), "bar");
+    sess = await EncryptedSession.Create(SocketConnection.ListenAndAwaitClient(ip).Result);
+    sess.SendMessage(new UserInfoMessage("awaiter"));
     Console.WriteLine("Client connected");
 }
 
@@ -87,7 +88,7 @@ sess.OnMsgProgress += (sender, progress) =>
     if(downloaded == 0)
         started = DateTime.Now;
     downloaded = progress.Current;
-    Console.Write("\r");
+    Console.Write("\r" + '\t'*5 + "\r");
     if (progress.Current < progress.Total)
     {
         Console.Write(

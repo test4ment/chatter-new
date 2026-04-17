@@ -11,14 +11,10 @@ public class SessionTest
     [Fact]
     public void UnencryptedSessionTest()
     {
-        var addr = new IPEndPoint(IPAddress.Loopback, 50000);
-        Session sess1 = null!;
-        var t = new Thread(() => 
-            sess1 = Session.CreateSession(
-                "foo", SocketConnection.ListenAndAwaitClient(addr)));
-        t.Start();
-        using var sess2 = Session.CreateSession("bar", SocketConnection.ConnectTo(addr));
-        t.Join();
+        var (client, server) = InMemoryConnection.CreatePair();
+        
+        using var sess1 = Session.CreateSession("foo", client);
+        using var sess2 = Session.CreateSession("bar", server);
         
         sess1.CheckForIncoming();
         sess2.CheckForIncoming();
@@ -37,21 +33,17 @@ public class SessionTest
         sess2.CheckForIncoming();
         
         Assert.Equal(3, called);
-        
-        sess1.Dispose();
     }
     
     [Fact]
-    public void EncryptedSessionTest()
+    public async Task EncryptedSessionTest()
     {
-        var addr = new IPEndPoint(IPAddress.Loopback, 50010);
-        EncryptedSession sess1 = null!;
-        var t = new Thread(() => 
-            sess1 = EncryptedSession.Create(
-                SocketConnection.ListenAndAwaitClient(addr), "foo"));
-        t.Start();
-        using var sess2 = EncryptedSession.Create(SocketConnection.ConnectTo(addr), "bar");
-        t.Join();
+        var (client, server) = InMemoryConnection.CreatePair();
+        
+        var sess1t = EncryptedSession.Create(client);
+        var sess2t = EncryptedSession.Create(server);
+        using var sess1 = await sess1t;
+        using var sess2 = await sess2t;
         
         sess1.CheckForIncoming();
         sess2.CheckForIncoming();
@@ -70,7 +62,5 @@ public class SessionTest
         sess2.CheckForIncoming();
         
         Assert.Equal(3, called);
-        
-        sess1.Dispose();
     }
 }
