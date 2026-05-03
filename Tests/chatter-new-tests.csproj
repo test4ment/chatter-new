@@ -30,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\chatter-new-auth\chatter-new-auth.csproj" />
     <ProjectReference Include="..\Lib\chatter-new.csproj" />
   </ItemGroup>
 
