@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 
 namespace chatter_new_auth;
 
+// TODO: merge with BytesEncryption, maybe in crypto module
 public class UniversalEncryption(byte[] rawPassword)
 {
     public byte[] Encrypt(byte[] data)
