@@ -33,12 +33,16 @@ public class Authentification
     [Fact]
     public void PublicKeyAuthentity()
     {
-        var identity = new Identity();
-        
-        
         // identity provides public and private key
+        var identityAlice = new Identity();
+        
         // share public
-        // receive encrypted data
-        // response with normal answer
+        var bobReceived = identityAlice.PublicKey;
+        var bobEncryption = new PublicIdentity(bobReceived);
+        var bobMessage = "bobMessage".Encode();
+        var bobMsgEncrypted = bobEncryption.Encrypt(bobMessage);
+        
+        // receive and read encrypted data
+        Assert.Equal(identityAlice.Decrypt(bobMsgEncrypted), bobMessage);
     }
 }
