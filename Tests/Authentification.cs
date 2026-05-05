@@ -21,7 +21,8 @@ public class Authentification
         var loadedIdentity = Identity.FromJSON(saved, pw);
         
         // encryption still works
-        Assert.Equal(loadedIdentity.Encrypt(somedata), somedataEncrypted);
+        var newEnc = loadedIdentity.Encrypt(somedata);
+        Assert.Equal(identity.Decrypt(newEnc), somedata);
         
         // decrypt some personal data
         var somedataDecrypted = loadedIdentity.Decrypt(somedataEncrypted);
