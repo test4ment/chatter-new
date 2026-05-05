@@ -37,11 +37,17 @@ public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDis
     public async Task SendAsync(byte[] data, int offset, int length) => await sock.SendAsync(data[offset..(offset + length)]);
     public async Task<int> ReceiveAsync(byte[] buffer) => await sock.ReceiveAsync(buffer);
 
-    public static SocketConnection ConnectTo(IPEndPoint address, int timeoutMs = 0)
+    public static async Task<SocketConnection> ConnectTo(IPEndPoint address)
     {
-        var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp){SendTimeout = timeoutMs};
-        sock.Connect(address);
-        return new SocketConnection(sock);
+        var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        try {
+            await sock.ConnectAsync(address);
+            return new SocketConnection(sock);
+        }
+        catch {
+            sock.Dispose();
+            throw;
+        }
     }
     public static async Task<SocketConnection> ListenAndAwaitClient(IPEndPoint address)
     {
@@ -50,23 +56,15 @@ public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDis
         sock.Listen(1);
         return new SocketConnection(await sock.AcceptAsync());
     }
-    public static async Task<IEnumerable<SocketConnection>> ListenAndAwaitClients(IPEndPoint address, TimeSpan timeout) // TODO: Async
+    public static async IAsyncEnumerable<SocketConnection> ListenAndAwaitClients(IPEndPoint address)
     {
         using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         sock.Bind(address);
         sock.Listen();
-        var connections = new List<SocketConnection>();
-        var waitUntil = DateTime.Now.Add(timeout);
-        while (DateTime.Now < waitUntil) {
-            if (sock.Poll(waitUntil - DateTime.Now, SelectMode.SelectRead)) {
-                connections.Add(new SocketConnection(await sock.AcceptAsync()));
-            }    
+        
+        while (true) {
+            yield return new SocketConnection(await sock.AcceptAsync());
         }
-        return connections;
-    }
-    public static SocketConnection TryAwaitClient(IPEndPoint address)
-    {
-        throw new NotImplementedException();
     }
 
     public void Dispose()

@@ -15,7 +15,7 @@ EncryptedSession sess;
 if (Console.ReadKey(true).Key == ConsoleKey.C )
 {
     Console.WriteLine("Connect mode");
-    sess = await EncryptedSession.Create(SocketConnection.ConnectTo(ip));
+    sess = await EncryptedSession.Create(SocketConnection.ConnectTo(ip).Result);
     sess.SendMessage(new UserInfoMessage("connector"));
     Console.WriteLine("Connected");
 }
