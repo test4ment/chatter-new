@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "chatter-new-tests", "Tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "chatter-new-auth", "chatter-new-auth\chatter-new-auth.csproj", "{BF0F51C2-4A88-4CA6-80AA-C187CCA7EAE3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "chatter-server", "chatter-server\chatter-server.csproj", "{B7769D4A-6DE5-49E9-BA34-1B6F0B2095CB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -31,5 +33,9 @@ Global
 		{BF0F51C2-4A88-4CA6-80AA-C187CCA7EAE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BF0F51C2-4A88-4CA6-80AA-C187CCA7EAE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BF0F51C2-4A88-4CA6-80AA-C187CCA7EAE3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7769D4A-6DE5-49E9-BA34-1B6F0B2095CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7769D4A-6DE5-49E9-BA34-1B6F0B2095CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7769D4A-6DE5-49E9-BA34-1B6F0B2095CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7769D4A-6DE5-49E9-BA34-1B6F0B2095CB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
