@@ -4,12 +4,14 @@ using chatter_new.Messaging;
 using chatter_new.Messaging.Messages;
 using chatter_new.Messaging.Session;
 
-var sessionMaker = SocketConnection.ListenAndAwaitClients(new IPEndPoint(IPAddress.Any, 16777)).ConfigureAwait(false);
+var ep = new IPEndPoint(IPAddress.Any, 16777);
+Console.WriteLine($"Server is running on {ep}");
+var tokenHolder = new CancellationTokenSource();
+var sessionMaker = SocketConnection.ListenAndAwaitClients(ep).ConfigureAwait(false);
 var sessions = new ConcurrentDictionary<int, EncryptedSession>();
-var listenerTask = Task.Run(async () =>
+_ = Task.Run(async () =>
 {
-    await foreach (var client in sessionMaker)
-    {
+    await foreach (var client in sessionMaker) {
         var newSess = await EncryptedSession.Create(client);
         var id = sessions.Count;
         newSess.OnReceive += (s, msg) =>
@@ -18,7 +20,7 @@ var listenerTask = Task.Run(async () =>
             {
                 Console.WriteLine($"{id}: {tmsg.Text}");
             }
-            else if (msg is SystemMessage sysmsg && sysmsg.Type == SystemMessage.SysMsgType.Left)
+            else if (msg is SystemMessage { Type: SystemMessage.SysMsgType.Left } sysmsg)
             {
                 Console.WriteLine($"{id} sent {sysmsg.Type}");
                 if (!sessions.Remove(id, out _)) {
@@ -32,12 +34,14 @@ var listenerTask = Task.Run(async () =>
         };
         sessions[id] = newSess;
     }
-});
+}, tokenHolder.Token);
 
+Console.CancelKeyPress += (sender, eventArgs) =>
+{
+    Console.WriteLine("Shutting down...");
+    tokenHolder.Cancel();
+};
 while (true)
 {
-    
+    // add sending to clients   
 }
-
-listenerTask.Cancel
-Console.WriteLine("Hello, World!");
