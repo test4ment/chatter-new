@@ -6,6 +6,7 @@ using chatter_new.Messaging.Session;
 
 var ep = new IPEndPoint(IPAddress.Any, 16777);
 Console.WriteLine($"Server is running on {ep}");
+var coutner = 0;
 var tokenHolder = new CancellationTokenSource();
 var sessionMaker = SocketConnection.ListenAndAwaitClients(ep).ConfigureAwait(false);
 var sessions = new ConcurrentDictionary<int, EncryptedSession>();
@@ -13,13 +14,13 @@ _ = Task.Run(async () =>
 {
     await foreach (var client in sessionMaker) {
         var newSess = await EncryptedSession.Create(client);
-        var id = sessions.Count;
+        Console.WriteLine("Got new client");
+        var id = Interlocked.Increment(ref coutner);
+        
         newSess.OnReceive += (s, msg) =>
         {
             if (msg is TextMessage tmsg)
-            {
                 Console.WriteLine($"{id}: {tmsg.Text}");
-            }
             else if (msg is SystemMessage { Type: SystemMessage.SysMsgType.Left } sysmsg)
             {
                 Console.WriteLine($"{id} sent {sysmsg.Type}");
@@ -33,15 +34,20 @@ _ = Task.Run(async () =>
             }
         };
         sessions[id] = newSess;
+        Console.WriteLine($"Added client with id {id}");
     }
 }, tokenHolder.Token);
 
 Console.CancelKeyPress += (sender, eventArgs) =>
 {
     Console.WriteLine("Shutting down...");
+    foreach (var session in sessions.Values)
+        session.SendMessage(new SystemMessage(SystemMessage.SysMsgType.Left));
     tokenHolder.Cancel();
 };
 while (true)
 {
+    foreach (var session in sessions.Values) session.CheckForIncoming();
+    await Task.Delay(10, tokenHolder.Token);
     // add sending to clients   
 }

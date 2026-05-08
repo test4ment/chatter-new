@@ -8,23 +8,38 @@ Console.InputEncoding = Encoding.Unicode;
 Console.OutputEncoding = Encoding.Unicode;
 
 Console.WriteLine("Hello, World!");
+Console.WriteLine("1. Client connect to localhost:50001");
+Console.WriteLine("2. Client connect to localhost:16777");
+Console.WriteLine("3. Server listen at localhost:50001");
 
 var ip = new IPEndPoint(IPAddress.Loopback, 50001);
 EncryptedSession sess;
 
-if (Console.ReadKey(true).Key == ConsoleKey.C )
+var key = Console.ReadKey(true).Key;
+switch (key)
 {
-    Console.WriteLine("Connect mode");
-    sess = await EncryptedSession.Create(SocketConnection.ConnectTo(ip).Result);
-    sess.SendMessage(new UserInfoMessage("connector"));
-    Console.WriteLine("Connected");
-}
-else
-{
-    Console.WriteLine("Await mode");
-    sess = await EncryptedSession.Create(SocketConnection.ListenAndAwaitClient(ip).Result);
-    sess.SendMessage(new UserInfoMessage("awaiter"));
-    Console.WriteLine("Client connected");
+    case ConsoleKey.D1:
+        Console.WriteLine("Connect mode");
+        sess = await EncryptedSession.Create(SocketConnection.ConnectTo(ip).Result);
+        sess.SendMessage(new UserInfoMessage("connector"));
+        Console.WriteLine("Connected");
+        break;
+    case ConsoleKey.D2:
+        ip = new IPEndPoint(IPAddress.Loopback, 16777);
+        Console.WriteLine("Connect mode");
+        sess = await EncryptedSession.Create(SocketConnection.ConnectTo(ip).Result);
+        sess.SendMessage(new UserInfoMessage("connector"));
+        Console.WriteLine("Connected");
+        break;
+    case ConsoleKey.D3:
+        Console.WriteLine("Await mode");
+        sess = await EncryptedSession.Create(SocketConnection.ListenAndAwaitClient(ip).Result);
+        sess.SendMessage(new UserInfoMessage("awaiter"));
+        Console.WriteLine("Client connected");
+        break;
+    default:
+        return;
+        break;
 }
 
 bool running = true;
