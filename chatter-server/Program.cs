@@ -45,10 +45,16 @@ Console.CancelKeyPress += (sender, eventArgs) =>
     foreach (var session in sessions.Values)
         session.SendMessage(new SystemMessage(SystemMessage.SysMsgType.Left));
     tokenHolder.Cancel();
+    eventArgs.Cancel = true;
 };
 while (true)
 {
     foreach (var session in sessions.Values) session.CheckForIncoming();
-    await Task.Delay(10, tokenHolder.Token);
+    try {
+        await Task.Delay(10, tokenHolder.Token).ConfigureAwait(false);
+    }
+    catch (TaskCanceledException) {
+        return;
+    }
     // add sending to clients   
 }
