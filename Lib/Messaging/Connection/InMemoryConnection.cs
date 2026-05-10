@@ -1,4 +1,4 @@
-namespace chatter_new.Messaging;
+namespace chatter_new.Messaging.Connection;
 
 public class InMemoryConnection : IConnection, IConnectionAsync
 {

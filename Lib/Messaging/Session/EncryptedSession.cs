@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text.Json;
+using chatter_new.Messaging.Connection;
 using chatter_new.Messaging.Messages;
 
 namespace chatter_new.Messaging.Session;

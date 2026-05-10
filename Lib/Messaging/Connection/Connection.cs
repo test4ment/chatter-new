@@ -1,9 +1,7 @@
-using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
-using static chatter_new.Messaging.IConnection; 
 
-namespace chatter_new.Messaging;
+namespace chatter_new.Messaging.Connection;
 
 public interface IConnection
 {

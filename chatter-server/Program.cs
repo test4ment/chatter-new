@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
 using chatter_new.Messaging;
+using chatter_new.Messaging.Connection;
 using chatter_new.Messaging.Messages;
 using chatter_new.Messaging.Session;
 

@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using chatter_new.Messaging;
+using chatter_new.Messaging.Connection;
 
 namespace chatter_new_tests;
 
