@@ -9,7 +9,7 @@ var ep = new IPEndPoint(IPAddress.Any, 16777);
 Console.WriteLine($"Server is running on {ep}");
 var coutner = 0;
 var tokenHolder = new CancellationTokenSource();
-var sessionMaker = SocketConnection.ListenAndAwaitClients(ep).ConfigureAwait(false);
+var sessionMaker = SocketConnection.ListenAndAwaitClients(ep, tokenHolder.Token).ConfigureAwait(false);
 var sessions = new ConcurrentDictionary<int, EncryptedSession>();
 _ = Task.Run(async () =>
 {
