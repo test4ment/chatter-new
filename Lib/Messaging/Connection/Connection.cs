@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 
 namespace chatter_new.Messaging.Connection;
 
@@ -35,11 +36,11 @@ public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDis
     public async Task SendAsync(byte[] data, int offset, int length) => await sock.SendAsync(data[offset..(offset + length)]);
     public async Task<int> ReceiveAsync(byte[] buffer) => await sock.ReceiveAsync(buffer);
 
-    public static async Task<SocketConnection> ConnectTo(IPEndPoint address)
+    public static async Task<SocketConnection> ConnectTo(IPEndPoint address, CancellationToken ct = default)
     {
         var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         try {
-            await sock.ConnectAsync(address);
+            await sock.ConnectAsync(address, ct);
             return new SocketConnection(sock);
         }
         catch {
@@ -47,21 +48,22 @@ public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDis
             throw;
         }
     }
-    public static async Task<SocketConnection> ListenAndAwaitClient(IPEndPoint address)
+    public static async Task<SocketConnection> ListenAndAwaitClient(IPEndPoint address, CancellationToken ct = default)
     {
         using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         sock.Bind(address);
         sock.Listen(1);
-        return new SocketConnection(await sock.AcceptAsync());
+        return new SocketConnection(await sock.AcceptAsync(ct));
     }
-    public static async IAsyncEnumerable<SocketConnection> ListenAndAwaitClients(IPEndPoint address)
+    public static async IAsyncEnumerable<SocketConnection> ListenAndAwaitClients(IPEndPoint address, [EnumeratorCancellation] CancellationToken ct = default)
     {
         using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         sock.Bind(address);
         sock.Listen();
         
-        while (true) {
-            yield return new SocketConnection(await sock.AcceptAsync());
+        while (!ct.IsCancellationRequested)
+        {
+            yield return new SocketConnection(await sock.AcceptAsync(ct));
         }
     }
 
