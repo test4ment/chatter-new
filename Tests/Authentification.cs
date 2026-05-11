@@ -29,6 +29,17 @@ public class Authentification
 
         Assert.Equal(somedata, somedataDecrypted);
     }
+    [Fact]
+    public void FailIdentityLoad()
+    {
+        var identity = new Identity();
+        var pw = "password".Encode();
+        var saved = identity.Serialize(pw);
+        // create identity with password
+
+        var pw2 = "definitelythepassword".Encode();
+        Assert.Throws<AuthenticationTagMismatchException>(() => Identity.FromJSON(saved, pw2));
+    }
 
     [Fact]
     public void PublicKeyAuthentity()

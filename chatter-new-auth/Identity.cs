@@ -30,7 +30,8 @@ public sealed class Identity: IDisposable
         }
         finally { Array.Clear(privateKeyRaw); }
     }
-
+    
+    /// <exception cref="AuthenticationTagMismatchException">Provided password is invalid</exception>>
     public static Identity FromJSON(string json, byte[] password)
     {
         var rec = JsonSerializer.Deserialize<IdentityJSON>(json)!;
