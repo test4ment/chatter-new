@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 
 namespace chatter_crypto;
 
+// TODO: Stream encryption
 public class UniversalEncryption(byte[] inputKeyingMaterial, bool passwordDerivation)
 {
     private const int NonceSize = 12;
