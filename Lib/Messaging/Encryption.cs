@@ -21,26 +21,3 @@ public class DHKeyExchange: IDisposable
     }
 }
 
-public class BytesEncryption(byte[] initKey)
-{
-    public byte[] Encrypt(byte[] data)
-    {
-        using var aes = InitAes();
-        return aes.EncryptCbc(data, aes.IV);
-    }
-
-    public byte[] Decrypt(byte[] data)
-    {
-        using var aes = InitAes();
-        return aes.DecryptCbc(data, aes.IV);
-    }
-
-    private Aes InitAes()
-    {
-        var aes = Aes.Create();
-        aes.Key = initKey;
-        aes.IV = HKDF.DeriveKey(HashAlgorithmName.SHA1, initKey, aes.IV.Length);
-        
-        return aes;
-    }
-}

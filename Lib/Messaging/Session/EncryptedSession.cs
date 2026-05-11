@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text.Json;
+using chatter_crypto;
 using chatter_new.Messaging.Connection;
 using chatter_new.Messaging.Messages;
 
@@ -10,7 +11,7 @@ public class EncryptedSession: ISession, IDisposable
     private readonly IConnectionAsync connection;
     private readonly List<byte> buffer = new List<byte>(); // TODO: use IO.Pipelines
     private DHKeyExchange? keyExchange = null; // TODO: key cycling
-    private BytesEncryption? encryption = null;
+    private UniversalEncryption? encryption = null;
     private int leftToReceive = 0;
     private MessageMetadata? metadata = null;
     private int sent = 0;
@@ -54,7 +55,7 @@ public class EncryptedSession: ISession, IDisposable
         keyExchange.Dispose();
         keyExchange = null;
         
-        encryption = new BytesEncryption(key);
+        encryption = new UniversalEncryption(key, false);
     }
     public void SendMessage(BaseMessage message)
     {
