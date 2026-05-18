@@ -11,7 +11,7 @@ public class EncryptedSession: ISession, IDisposable
     private readonly IConnectionAsync connection;
     private readonly List<byte> buffer = new List<byte>(); // TODO: use IO.Pipelines
     private DHKeyExchange? keyExchange = null; // TODO: key cycling
-    private UniversalEncryption? encryption = null;
+    private UniversalEncryption? encryption = null; // TODO: encryption dependency
     private int leftToReceive = 0;
     private MessageMetadata? metadata = null;
     private int sent = 0;
@@ -36,7 +36,7 @@ public class EncryptedSession: ISession, IDisposable
     }
     private void SendHandshake()
     {
-        keyExchange = new DHKeyExchange();
+        keyExchange = new DHKeyExchange(); // TODO: inject key exchange
         connection.Send(keyExchange.PublicKey);
     }
     private async Task AwaitHandshake()
