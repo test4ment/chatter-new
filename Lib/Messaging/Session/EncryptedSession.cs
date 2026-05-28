@@ -46,14 +46,21 @@ public class EncryptedSession: ISession, IDisposable
     {
         var len = keyExchange!.PublicKey.Length;
         var keyBuf = ArrayPool<byte>.Shared.Rent(len);
-        var recv = 0;
-        while ((recv += await connection.ReceiveAsync(keyBuf)) < len)
+        byte[] key;
+        try
         {
-            await Task.Delay(1);
+            var recv = 0;
+            while ((recv += await connection.ReceiveAsync(keyBuf)) < len)
+            {
+                await Task.Delay(1);
+            }
+
+            key = keyExchange!.DerivePrivateKey(keyBuf[..len]);
         }
-        
-        var key = keyExchange!.DerivePrivateKey(keyBuf[..len]);
-        ArrayPool<byte>.Shared.Return(keyBuf);
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(keyBuf, true);
+        }
         
         keyExchange.Dispose();
         keyExchange = null;
@@ -133,7 +140,7 @@ public class EncryptedSession: ISession, IDisposable
             if (_pendingMetadata is { TrackProgress: true })
                 OnMsgProgress?.Invoke(this, new Progress()
                 {
-                    Num = sent, Current = buffer.Count, Total = _pendingMetadata.ContentSize
+                    Current = buffer.Count, Total = _pendingMetadata.ContentSize
                 });
             return false;
         }
