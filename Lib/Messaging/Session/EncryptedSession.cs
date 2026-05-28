@@ -32,15 +32,15 @@ public class EncryptedSession: ISession, IDisposable
     {
         var session = new EncryptedSession(connection);
         
-        session.SendHandshake();
+        await session.SendHandshake();
         await session.AwaitHandshake();
         
         return session;
     }
-    private void SendHandshake()
+    private async Task SendHandshake()
     {
         keyExchange = new DHKeyExchange(); // TODO: inject key exchange
-        connection.SendAsync(keyExchange.PublicKey);
+        await connection.SendAsync(keyExchange.PublicKey);
     }
     private async Task AwaitHandshake()
     {
