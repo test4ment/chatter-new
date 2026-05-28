@@ -7,24 +7,24 @@ namespace chatter_new.Messaging.Connection;
 public interface IConnection
 {
     public int Available { get; }
-    public void Send(byte[] data); // TODO: return sent bytes count
-    public void Send(byte[] data, int offset, int length);
+    public int Send(byte[] data);
+    public int Send(byte[] data, int offset, int length);
     public int Receive(byte[] buffer);
     public int Receive(byte[] buffer, int offset, int count);
 }
 
 public interface IConnectionAsync: IConnection
 {
-    public Task SendAsync(byte[] data);
-    public Task SendAsync(byte[] data, int offset, int length);
+    public Task<int> SendAsync(byte[] data);
+    public Task<int> SendAsync(byte[] data, int offset, int length);
     public Task<int> ReceiveAsync(byte[] buffer);
 }
 
 public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDisposable
 {
     public int Available => sock.Available;
-    public void Send(byte[] data) => sock.Send(data);
-    public void Send(byte[] data, int offset, int length) 
+    public int Send(byte[] data) => sock.Send(data);
+    public int Send(byte[] data, int offset, int length) 
         => sock.Send(data, offset, length, SocketFlags.None);
     public int Receive(byte[] buffer) 
         => Available > 0 ? sock.Receive(buffer) : 0;
@@ -32,8 +32,8 @@ public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDis
     public int Receive(byte[] buffer, int offset, int count) 
         => Available > 0 ? sock.Receive(buffer, offset, count, SocketFlags.None) : 0;
 
-    public async Task SendAsync(byte[] data) => await sock.SendAsync(data);
-    public async Task SendAsync(byte[] data, int offset, int length) => await sock.SendAsync(data[offset..(offset + length)]);
+    public async Task<int> SendAsync(byte[] data) => await sock.SendAsync(data);
+    public async Task<int> SendAsync(byte[] data, int offset, int length) => await sock.SendAsync(data[offset..(offset + length)]);
     public async Task<int> ReceiveAsync(byte[] buffer) => await sock.ReceiveAsync(buffer);
 
     public static async Task<SocketConnection> ConnectTo(IPEndPoint address, CancellationToken ct = default)

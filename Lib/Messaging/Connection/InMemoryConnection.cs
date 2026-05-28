@@ -18,13 +18,18 @@ public class InMemoryConnection : IConnection, IConnectionAsync
 
     public int Available => buf.Count;
 
-    public void Send(byte[] data)
+    public int Send(byte[] data)
     {
         another.FillData(data);
+        return data.Length;
     }
 
-    public void Send(byte[] data, int offset, int length) 
-        => another.FillData(data[offset..(offset + length)]);
+    public int Send(byte[] data, int offset, int length)
+    {
+        another.FillData(data[offset..(offset + length)]);
+        return length;
+    }
+
     public int Receive(byte[] buffer) 
         => Receive(buffer, 0, buffer.Length);
 
@@ -44,30 +49,16 @@ public class InMemoryConnection : IConnection, IConnectionAsync
     }
 
     private void FillData(byte[] data) => buf.AddRange(data);
-    public Task SendAsync(byte[] data)
+    public Task<int> SendAsync(byte[] data)
     {
-        try
-        {
-            Send(data);
-            return Task.CompletedTask;
-        }
-        catch (Exception exception)
-        {
-            return Task.FromException(exception);
-        }
+        Send(data);
+        return Task.FromResult(data.Length);
     }
 
-    public Task SendAsync(byte[] data, int offset, int length)
+    public Task<int> SendAsync(byte[] data, int offset, int length)
     {
-        try
-        {
-            Send(data, offset, length);
-            return Task.CompletedTask;
-        }
-        catch (Exception exception)
-        {
-            return Task.FromException(exception);
-        }
+        Send(data, offset, length);
+        return Task.FromResult(length);
     }
 
     public Task<int> ReceiveAsync(byte[] buffer)
