@@ -2,6 +2,7 @@ using chatter_new.Messaging.Messages;
 
 namespace chatter_new.Messaging.Session;
 
+[Obsolete("Have no usage")]
 public interface ISession
 {
     public void SendMessage(BaseMessage message);
