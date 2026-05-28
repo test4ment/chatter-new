@@ -49,27 +49,20 @@ public class InMemoryConnection : IConnection, IConnectionAsync
     }
 
     private void FillData(byte[] data) => buf.AddRange(data);
-    public Task<int> SendAsync(byte[] data)
+    public Task<int> SendAsync(byte[] data, CancellationToken cancellationToken = default)
     {
         Send(data);
         return Task.FromResult(data.Length);
     }
 
-    public Task<int> SendAsync(byte[] data, int offset, int length)
+    public Task<int> SendAsync(byte[] data, int offset, int length, CancellationToken cancellationToken = default)
     {
         Send(data, offset, length);
         return Task.FromResult(length);
     }
 
-    public Task<int> ReceiveAsync(byte[] buffer)
+    public Task<int> ReceiveAsync(byte[] buffer, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return Task.FromResult(Receive(buffer));
-        }
-        catch (Exception exception)
-        {
-            return Task.FromException<int>(exception);
-        }
+        return Task.FromResult(Receive(buffer));
     }
 }

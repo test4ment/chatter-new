@@ -15,26 +15,29 @@ public interface IConnection
 
 public interface IConnectionAsync: IConnection
 {
-    public Task<int> SendAsync(byte[] data);
-    public Task<int> SendAsync(byte[] data, int offset, int length);
-    public Task<int> ReceiveAsync(byte[] buffer);
+    public Task<int> SendAsync(byte[] data, CancellationToken cancellationToken = default);
+    public Task<int> SendAsync(byte[] data, int offset, int length, CancellationToken cancellationToken = default);
+    public Task<int> ReceiveAsync(byte[] buffer, CancellationToken cancellationToken = default);
 }
 
 public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDisposable
 {
     public int Available => sock.Available;
+    
     public int Send(byte[] data) => sock.Send(data);
     public int Send(byte[] data, int offset, int length) 
         => sock.Send(data, offset, length, SocketFlags.None);
     public int Receive(byte[] buffer) 
         => Available > 0 ? sock.Receive(buffer) : 0;
-
     public int Receive(byte[] buffer, int offset, int count) 
         => Available > 0 ? sock.Receive(buffer, offset, count, SocketFlags.None) : 0;
 
-    public async Task<int> SendAsync(byte[] data) => await sock.SendAsync(data);
-    public async Task<int> SendAsync(byte[] data, int offset, int length) => await sock.SendAsync(data[offset..(offset + length)]);
-    public async Task<int> ReceiveAsync(byte[] buffer) => await sock.ReceiveAsync(buffer);
+    public async Task<int> SendAsync(byte[] data, CancellationToken cancellationToken = default) 
+        => await sock.SendAsync(data, cancellationToken);
+    public async Task<int> SendAsync(byte[] data, int offset, int length, CancellationToken cancellationToken = default) 
+        => await sock.SendAsync(data.AsMemory()[offset..(offset + length)], cancellationToken);
+    public async Task<int> ReceiveAsync(byte[] buffer, CancellationToken cancellationToken = default) 
+        => await sock.ReceiveAsync(buffer, cancellationToken);
 
     public static async Task<SocketConnection> ConnectTo(IPEndPoint address, CancellationToken ct = default)
     {

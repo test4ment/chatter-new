@@ -40,7 +40,7 @@ public class EncryptedSession: ISession, IDisposable
     private void SendHandshake()
     {
         keyExchange = new DHKeyExchange(); // TODO: inject key exchange
-        connection.Send(keyExchange.PublicKey);
+        connection.SendAsync(keyExchange.PublicKey);
     }
     private async Task AwaitHandshake()
     {
