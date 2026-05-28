@@ -8,17 +8,20 @@ namespace chatter_new.Messaging.Session;
 
 public class EncryptedSession: ISession, IDisposable
 {
+    private enum ReceiverState { AwaitingHeader, AwaitingMetadata, AwaitingPayload }
     private readonly IConnectionAsync connection;
     private readonly List<byte> buffer = new List<byte>(); // TODO: use IO.Pipelines
     private DHKeyExchange? keyExchange = null; // TODO: key cycling
     private UniversalEncryption? encryption = null; // TODO: encryption dependency
-    private int leftToReceive = 0;
-    private MessageMetadata? metadata = null;
+    private ReceiverState _currentState = ReceiverState.AwaitingHeader;
+    private int _remainingBytes = 0;
+    private MessageMetadata? _pendingMetadata = null;
     private int sent = 0;
     public bool IsDisposed { get; private set; } = false;
     
     public event EventHandler<BaseMessage>? OnSend;
     public event EventHandler<BaseMessage>? OnReceive;
+    [Obsolete]
     public event EventHandler<Progress>? OnMsgProgress;
     private EncryptedSession(IConnectionAsync connection)
     {
@@ -84,58 +87,66 @@ public class EncryptedSession: ISession, IDisposable
         var recv = connection.Receive(buf); // blocks
         buffer.AddRange(buf[..recv]);
         ArrayPool<byte>.Shared.Return(buf);
-        
-        while(true)
-        {
-            if (leftToReceive == 0)
-                if (buffer.Count >= sizeof(int))
-                {
-                    leftToReceive = buffer[..sizeof(int)].ToArray().DecodeInt();
-                    buffer.RemoveRange(0, sizeof(int));
-                } else return;
 
-            if (buffer.Count < leftToReceive)
+        bool canContinue = true;
+        while (canContinue)
+        {
+            canContinue = _currentState switch
             {
-                if(metadata is { TrackProgress: true }) UpdateProgress();         
-                return;
-            }
-            
-            if (metadata == null)
-                ProccessMeta();
-            else {
-                if(metadata is { TrackProgress: true }) UpdateProgress();
-                ProccessMessage();
-            }
+                ReceiverState.AwaitingHeader   => TryReadHeader(),
+                ReceiverState.AwaitingMetadata => TryReadMetadata(),
+                ReceiverState.AwaitingPayload  => TryReadPayload(),
+                _ => false
+            };
         }
     }
 
-    private void UpdateProgress()
+    private bool TryReadHeader()
     {
-        OnMsgProgress?.Invoke(this, new Progress() {
-            Num = sent, Current = buffer.Count, Total = metadata!.ContentSize
-        });
+        if (buffer.Count < sizeof(int))
+            return false;
+
+        _remainingBytes = buffer[..sizeof(int)].ToArray().DecodeInt();
+        buffer.RemoveRange(0, sizeof(int));
+        _currentState = ReceiverState.AwaitingMetadata;
+        return true;
     }
 
-    private void ProccessMeta()
+    private bool TryReadMetadata()
     {
-        var msg = ReadMessage().Decode();
-        metadata = JsonSerializer.Deserialize<MessageMetadata>(msg);
-        leftToReceive = metadata!.ContentSize;
+        if (buffer.Count < _remainingBytes)
+            return false;
+
+        var encrypted = buffer[.._remainingBytes].ToArray();
+        buffer.RemoveRange(0, _remainingBytes);
+        var decrypted = encryption!.Decrypt(encrypted).Decode();
+        _pendingMetadata = JsonSerializer.Deserialize<MessageMetadata>(decrypted);
+        _remainingBytes = _pendingMetadata!.ContentSize;
+        _currentState = ReceiverState.AwaitingPayload;
+        return true;
     }
 
-    private void ProccessMessage()
+    private bool TryReadPayload()
     {
-        var msg = ReadMessage().Decode();
-        OnReceive?.Invoke(this, JsonSerializer.Deserialize<BaseMessage>(msg)!);
-        metadata = null;
-    }
+        if (buffer.Count < _remainingBytes)
+        {
+            if (_pendingMetadata is { TrackProgress: true })
+                OnMsgProgress?.Invoke(this, new Progress()
+                {
+                    Num = sent, Current = buffer.Count, Total = _pendingMetadata.ContentSize
+                });
+            return false;
+        }
 
-    private byte[] ReadMessage()
-    {
-        var msgb = encryption!.Decrypt(buffer[..leftToReceive].ToArray());
-        buffer.RemoveRange(0, leftToReceive);
-        leftToReceive = 0;
-        return msgb;
+        var encrypted = buffer[.._remainingBytes].ToArray();
+        buffer.RemoveRange(0, _remainingBytes);
+        var decrypted = encryption!.Decrypt(encrypted).Decode();
+        OnReceive?.Invoke(this, JsonSerializer.Deserialize<BaseMessage>(decrypted)!); 
+
+        _remainingBytes = 0;
+        _pendingMetadata = null;
+        _currentState = ReceiverState.AwaitingHeader;
+        return true;
     }
     
     public void Dispose()
