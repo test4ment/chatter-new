@@ -17,7 +17,9 @@ public interface IConnectionAsync: IConnection
 {
     public Task<int> SendAsync(byte[] data, CancellationToken cancellationToken = default);
     public Task<int> SendAsync(byte[] data, int offset, int length, CancellationToken cancellationToken = default);
+    public Task<int> SendAsync(Memory<byte> data, CancellationToken cancellationToken = default);
     public Task<int> ReceiveAsync(byte[] buffer, CancellationToken cancellationToken = default);
+    public Task<int> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken = default);
 }
 
 public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDisposable
@@ -28,15 +30,22 @@ public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDis
     public int Send(byte[] data, int offset, int length) 
         => sock.Send(data, offset, length, SocketFlags.None);
     public int Receive(byte[] buffer) 
-        => Available > 0 ? sock.Receive(buffer) : 0;
+        => sock.Receive(buffer);
     public int Receive(byte[] buffer, int offset, int count) 
-        => Available > 0 ? sock.Receive(buffer, offset, count, SocketFlags.None) : 0;
+        => sock.Receive(buffer, offset, count, SocketFlags.None);
 
     public async Task<int> SendAsync(byte[] data, CancellationToken cancellationToken = default) 
         => await sock.SendAsync(data, cancellationToken);
     public async Task<int> SendAsync(byte[] data, int offset, int length, CancellationToken cancellationToken = default) 
         => await sock.SendAsync(data.AsMemory()[offset..(offset + length)], cancellationToken);
+
+    public async Task<int> SendAsync(Memory<byte> data, CancellationToken cancellationToken = default) 
+        => await sock.SendAsync(data, cancellationToken);
+
     public async Task<int> ReceiveAsync(byte[] buffer, CancellationToken cancellationToken = default) 
+        => await sock.ReceiveAsync(buffer, cancellationToken);
+
+    public async Task<int> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         => await sock.ReceiveAsync(buffer, cancellationToken);
 
     public static async Task<SocketConnection> ConnectTo(IPEndPoint address, CancellationToken ct = default)

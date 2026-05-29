@@ -61,8 +61,19 @@ public class InMemoryConnection : IConnection, IConnectionAsync
         return Task.FromResult(length);
     }
 
+    public Task<int> SendAsync(Memory<byte> data, CancellationToken cancellationToken = default)
+    {
+        Send(data.ToArray());
+        return Task.FromResult(data.Length);
+    }
+
     public Task<int> ReceiveAsync(byte[] buffer, CancellationToken cancellationToken = default)
     {
         return Task.FromResult(Receive(buffer));
+    }
+
+    public Task<int> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Receive(buffer.ToArray()));
     }
 }
