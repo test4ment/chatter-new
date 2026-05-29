@@ -4,7 +4,7 @@ namespace chatter_new.Messaging;
 
 public class Protocol(IConnectionAsync connection)
 {
-    private SemaphoreSlim semaphore = new(1, 1);
+    private readonly SemaphoreSlim semaphore = new(1, 1);
     
     public async Task Send(byte[] data, CancellationToken cancellationToken = default)
     {
@@ -18,9 +18,9 @@ public class Protocol(IConnectionAsync connection)
         }
     }
     
-    public void Recv()
+    public async Task Recv()
     {
-        throw new NotImplementedException();
+        // connection.ReceiveAsync();
     }
 }
 
