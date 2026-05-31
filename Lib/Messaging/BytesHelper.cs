@@ -1,4 +1,5 @@
-﻿using System.Buffers.Binary;
+﻿using System.Buffers;
+using System.Buffers.Binary;
 using System.Text;
 
 namespace chatter_new.Messaging;
@@ -19,4 +20,7 @@ public static class BytesHelper
         => BinaryPrimitives.ReadInt32BigEndian(data.AsSpan()[..sizeof(int)]);
     public static int DecodeInt(this List<byte> data)
         => DecodeInt(data[..sizeof(int)].ToArray());
+
+    public static int DecodeInt(this ReadOnlySequence<byte> data)
+        => BinaryPrimitives.ReadInt32BigEndian(data);
 }
