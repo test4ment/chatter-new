@@ -9,7 +9,6 @@ public class Protocol(IConnectionAsync connection)
     private readonly SemaphoreSlim semaphore = new(1, 1);
     private Pipe recvPipe = new();
     private const int bufferSize = 4096;
-    private int? awaitingPacketSize = null;
     
     public async Task Send(byte[] data, CancellationToken cancellationToken = default)
     {
@@ -22,6 +21,19 @@ public class Protocol(IConnectionAsync connection)
         finally {
             semaphore.Release();
         }
+    }
+    private static bool TryParseBuffer(ref ReadOnlySequence<byte> buffer, Action<ReadOnlySequence<byte>> callback)
+    {
+        if(buffer.Length < sizeof(int)) return false;
+        var pendingLen = buffer.Slice(0, sizeof(int)).DecodeInt();
+            
+        if(buffer.Length - sizeof(int) < pendingLen) return false;
+
+        callback(buffer.Slice(sizeof(int), pendingLen));
+            
+        buffer = buffer.Slice(pendingLen + sizeof(int));
+
+        return true;
     }
     
     public async Task<int> Receive(CancellationToken ct = default)
@@ -39,36 +51,56 @@ public class Protocol(IConnectionAsync connection)
         return recv;
     }
 
-    public async Task<IList<ReadOnlySequence<byte>>> CreateFrames(CancellationToken ct = default)
+    public async Task<IList<byte[]>?> GetFrameCopies(CancellationToken ct = default)
     {
         var reader = recvPipe.Reader;
-        
-        var r = await reader.ReadAsync(ct);
+
+        ReadResult r;
+        try
+        {
+            r = await reader.ReadAsync(ct);
+        } 
+        catch (OperationCanceledException) {
+            return null;
+        }
         var b = r.Buffer;
 
-        var res = new List<ReadOnlySequence<byte>>();
-        while (true)
-        {
-            if(ct.IsCancellationRequested) break;
-            
-            if (!awaitingPacketSize.HasValue) // hasnt gotten len
-            {
-                if (b.Length < sizeof(int)) break;
-                
-                awaitingPacketSize = b.Slice(0, sizeof(int)).DecodeInt();
-                b = b.Slice(sizeof(int));
+        var res = new List<byte[]>();
+        try {
+            while (!ct.IsCancellationRequested) {
+                if (!TryParseBuffer(
+                        ref b, 
+                        seq => res.Add(seq.ToArray()))
+                    ) break;
             }
-            
-            if (b.Length < awaitingPacketSize.Value) break;
-                
-            var packet = b.Slice(0, awaitingPacketSize.Value);
-            res.Add(packet);
-                
-            b = b.Slice(awaitingPacketSize.Value);
-            awaitingPacketSize = null;
+        }
+        finally {
+            reader.AdvanceTo(b.Start, r.Buffer.End);
         }
         
         return res;
+    }
+
+    public async Task NextFrame(Action<ReadOnlySequence<byte>> callback, CancellationToken ct = default)
+    {
+        var reader = recvPipe.Reader;
+
+        ReadResult r;
+        try {
+            r = await reader.ReadAsync(ct);
+        }
+        catch (OperationCanceledException) {
+            return; 
+        }
+        
+        var b = r.Buffer;
+
+        try {
+            TryParseBuffer(ref b, callback);
+        }
+        finally {
+            reader.AdvanceTo(b.Start, r.Buffer.End);
+        }
     }
 }
 

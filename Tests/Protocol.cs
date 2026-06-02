@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using chatter_new.Messaging;
 using chatter_new.Messaging.Connection;
 
@@ -17,11 +18,16 @@ public class ProtocolTests
         
         await protoa.Send(data, TestContext.Current.CancellationToken);
         await protob.Receive(TestContext.Current.CancellationToken);
-        
-        var res = await protob.CreateFrames(TestContext.Current.CancellationToken);
-        
-        Assert.Single(res);
-        Assert.Equal(res[0].ToArray(), data);
+
+        var tok = new CancellationTokenSource(TimeSpan.FromSeconds(2)).Token;
+        await protob.NextFrame(
+            frame => Assert.Equal(data, frame.ToArray()), 
+            tok
+            );
+        await protob.NextFrame(
+            _ => throw new UnreachableException(),
+            tok
+        );
     }
 
     [Fact]
@@ -40,8 +46,9 @@ public class ProtocolTests
         
         await protob.Receive(TestContext.Current.CancellationToken);
         
-        var res = await protob.CreateFrames(TestContext.Current.CancellationToken);
-        
+        var res = await protob.GetFrameCopies(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(res);
         Assert.Equal(3, res.Count);
         
         foreach (var (first, second) in res.Zip(data))
