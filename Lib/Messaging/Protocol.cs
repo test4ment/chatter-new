@@ -29,6 +29,10 @@ public class Protocol(IConnectionAsync connection)
         var writer = recvPipe.Writer;
         
         var recv = await connection.ReceiveAsync(writer.GetMemory(bufferSize), ct);
+        
+        if (recv == 0)
+            await writer.CompleteAsync();
+        
         writer.Advance(recv);
         
         await writer.FlushAsync(ct);
@@ -42,7 +46,7 @@ public class Protocol(IConnectionAsync connection)
         var r = await reader.ReadAsync(ct);
         var b = r.Buffer;
 
-        var res =  new List<ReadOnlySequence<byte>>();
+        var res = new List<ReadOnlySequence<byte>>();
         while (true)
         {
             if(ct.IsCancellationRequested) break;
@@ -54,15 +58,14 @@ public class Protocol(IConnectionAsync connection)
                 awaitingPacketSize = b.Slice(0, sizeof(int)).DecodeInt();
                 b = b.Slice(sizeof(int));
             }
-            else { // got len
-                if (b.Length < awaitingPacketSize.Value) break;
+            
+            if (b.Length < awaitingPacketSize.Value) break;
                 
-                var packet = b.Slice(0, awaitingPacketSize.Value);
-                res.Add(packet);
+            var packet = b.Slice(0, awaitingPacketSize.Value);
+            res.Add(packet);
                 
-                b = b.Slice(awaitingPacketSize.Value);
-                awaitingPacketSize = null;
-            }
+            b = b.Slice(awaitingPacketSize.Value);
+            awaitingPacketSize = null;
         }
         
         return res;
