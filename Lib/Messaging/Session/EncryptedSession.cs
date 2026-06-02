@@ -6,6 +6,7 @@ using chatter_new.Messaging.Messages;
 
 namespace chatter_new.Messaging.Session;
 
+[Obsolete]
 public class EncryptedSession: ISession, IDisposable
 {
     private enum ReceiverState { AwaitingHeader, AwaitingMetadata, AwaitingPayload }
