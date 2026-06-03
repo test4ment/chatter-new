@@ -81,7 +81,16 @@ public class Protocol(IConnectionAsync connection)
         return res;
     }
 
-    public async Task NextFrame(Action<ReadOnlySequence<byte>> callback, CancellationToken ct = default)
+    public async Task<byte[]> GetNextFrame(CancellationToken ct = default)
+    {
+        byte[]? result = null;
+        
+        while (!await ProcessNextFrame(sequence => result = sequence.ToArray(), ct)) { }
+        
+        return result!;
+    }
+
+    public async Task<bool> ProcessNextFrame(Action<ReadOnlySequence<byte>> callback, CancellationToken ct = default)
     {
         var reader = recvPipe.Reader;
 
@@ -90,13 +99,13 @@ public class Protocol(IConnectionAsync connection)
             r = await reader.ReadAsync(ct);
         }
         catch (OperationCanceledException) {
-            return; 
+            return false; 
         }
         
         var b = r.Buffer;
 
         try {
-            TryParseBuffer(ref b, callback);
+            return TryParseBuffer(ref b, callback);
         }
         finally {
             reader.AdvanceTo(b.Start, r.Buffer.End);

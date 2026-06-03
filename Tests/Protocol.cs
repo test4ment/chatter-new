@@ -20,11 +20,11 @@ public class ProtocolTests
         await protob.Receive(TestContext.Current.CancellationToken);
 
         var tok = new CancellationTokenSource(TimeSpan.FromSeconds(2)).Token;
-        await protob.NextFrame(
+        await protob.ProcessNextFrame(
             frame => Assert.Equal(data, frame.ToArray()), 
             tok
             );
-        await protob.NextFrame(
+        await protob.ProcessNextFrame(
             _ => throw new UnreachableException(),
             tok
         );
