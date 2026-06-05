@@ -9,7 +9,6 @@ public class DHHandshake(Protocol proto)
         using var keyExchange = new DHKeyExchange();
 
         await proto.Send(keyExchange.PublicKey, ct);
-        await proto.Receive(ct);
 
         var frame = await proto.GetNextFrame(ct);
 

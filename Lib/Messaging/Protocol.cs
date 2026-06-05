@@ -89,6 +89,35 @@ public class Protocol(IConnectionAsync connection)
         
         return result!;
     }
+    
+    public bool TryGetNextFrame(out byte[]? res)
+    {
+        byte[]? result = null;
+        if (TryProcessNextFrame(sequence => { result = sequence.ToArray(); }))
+        {
+            res = result;
+            return true;
+        }
+        res = null;
+        return false;
+    }
+    
+    public bool TryProcessNextFrame(Action<ReadOnlySequence<byte>> callback)
+    {
+        var reader = recvPipe.Reader;
+
+        var succ = reader.TryRead(out var r);
+        if (!succ) return false;
+        
+        var b = r.Buffer;
+
+        try {
+            return TryParseBuffer(ref b, callback);
+        }
+        finally {
+            reader.AdvanceTo(b.Start, r.Buffer.End);
+        }
+    }
 
     public async Task<bool> ProcessNextFrame(Action<ReadOnlySequence<byte>> callback, CancellationToken ct = default)
     {
