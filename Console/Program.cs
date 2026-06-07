@@ -70,7 +70,7 @@ await sess.Send(PrepareMsg(new UserInfoMessage(username)));
 Console.WriteLine("Sent username");
 
 var msgQueue = new ConcurrentQueue<byte[]>();
-_ = Task.Run(async void () =>
+_ = Task.Run((async Task () =>
 {
     while (!tok.IsCancellationRequested) {
         await sess.ProcessNextFrame(
@@ -78,7 +78,7 @@ _ = Task.Run(async void () =>
             tok.Token
         );
     }
-});
+})!, tok.Token);
 
 bool running = true;
 Console.CancelKeyPress += (_, __) =>
@@ -195,4 +195,6 @@ while (running)
             running = false;
         }
     }
+
+    await Task.Delay(16);
 }
