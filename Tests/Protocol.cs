@@ -70,6 +70,28 @@ public class ProtocolTests
     }
 
     [Fact]
+    public async Task LargeMessageDoesNotDeadlock()
+    {
+        var (a, b) = InMemoryConnection.CreatePair();
+        var protoa = new Protocol(a);
+        var protob = new Protocol(b);
+
+        var payload = new byte[2 * 1024 * 1024];
+        Random.Shared.NextBytes(payload);
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+        var ftask = Task.Run(async () => 
+            await protob.ReadNextFrameAsync(TestContext.Current.CancellationToken), timeout.Token);
+        
+        await protoa.Send(payload, TestContext.Current.CancellationToken);
+        
+        var frame = await ftask;
+
+        Assert.Equal(payload, frame);
+    }
+
+    [Fact]
     public async Task ReadFramesAsyncYieldsBufferedFramesThenEnds()
     {
         var connection = new StubConnection();
