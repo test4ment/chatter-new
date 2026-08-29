@@ -1,37 +1,42 @@
-using System.Net;
+using System.Buffers;
 using System.Text.Json;
+using chatter_crypto;
 using chatter_new.Messaging;
 using chatter_new.Messaging.Connection;
 using chatter_new.Messaging.Messages;
-using chatter_new.Messaging.Session;
 
 namespace chatter_new_tests;
 
 public class SessionTest
 {
     [Fact]
-    public void UnencryptedSessionTest()
+    public async Task UnencryptedSessionTest()
     {
         var (client, server) = InMemoryConnection.CreatePair();
         
-        using var sess1 = Session.CreateSession("foo", client);
-        using var sess2 = Session.CreateSession("bar", server);
-        
-        sess1.CheckForIncoming();
-        sess2.CheckForIncoming();
-        
-        sess1.SendMessage(new TextMessage("text"));
-        sess1.SendMessage(new TextMessage("text"));
-        sess1.SendMessage(new TextMessage("text"));
+        var sess1 = new Protocol(client);
+        var sess2 = new Protocol(server);
 
-        int called = 0;
-        sess2.OnReceive += (sender, s) => {
-            called++;
-            Assert.True(s is TextMessage msg);
-            Assert.Equal("text", ((TextMessage)s).Text);
-        };
+        var payload = new TextMessage("text").Serialize().Encode();
         
-        sess2.CheckForIncoming();
+        await sess1.Send(payload, TestContext.Current.CancellationToken);
+        await sess1.Send(payload, TestContext.Current.CancellationToken);
+        await sess1.Send(payload, TestContext.Current.CancellationToken);
+
+        var read = await sess2.Receive(TestContext.Current.CancellationToken);
+        
+        Assert.Equal(read, (payload.Length + sizeof(int)) * 3);
+        
+        int called = 0;
+        var cancellationToken = new CancellationTokenSource(TimeSpan.FromMilliseconds(50)).Token;
+        while (await sess2.ProcessNextFrame((readOnlySequence) =>
+               {
+                   called++;
+                   var s = readOnlySequence.ToArray().Decode();
+                   var msg = JsonSerializer.Deserialize<BaseMessage>(s);
+                   Assert.True(msg is TextMessage);
+                   Assert.Equal("text", ((TextMessage)msg).Text);
+               }, cancellationToken)) {}
         
         Assert.Equal(3, called);
     }
@@ -41,26 +46,28 @@ public class SessionTest
     {
         var (client, server) = InMemoryConnection.CreatePair();
         
-        var sess1t = EncryptedSession.Create(client);
-        var sess2t = EncryptedSession.Create(server);
-        using var sess1 = await sess1t;
-        using var sess2 = await sess2t;
+        var sess1 = new Protocol(client);
+        var sess2 = new Protocol(server);
         
-        sess1.CheckForIncoming();
-        sess2.CheckForIncoming();
+        var enc = new UniversalEncryption(Array.Empty<byte>(), false);
+        var payload = enc.Encrypt(new TextMessage("text").Serialize().Encode());
+        await sess1.Send(payload, TestContext.Current.CancellationToken);
+        await sess1.Send(payload, TestContext.Current.CancellationToken);
+        await sess1.Send(payload, TestContext.Current.CancellationToken);
         
-        sess1.SendMessage(new TextMessage("text"));
-        sess1.SendMessage(new TextMessage("text"));
-        sess1.SendMessage(new TextMessage("text"));
-
+        var read = await sess2.Receive(TestContext.Current.CancellationToken);
+        
+        Assert.Equal(read, (payload.Length + sizeof(int)) * 3);
+        
         int called = 0;
-        sess2.OnReceive += (sender, s) => {
-            called++;
-            Assert.True(s is TextMessage msg);
-            Assert.Equal("text", ((TextMessage)s).Text);
-        };
-        
-        sess2.CheckForIncoming();
+        while (await sess2.ProcessNextFrame((readOnlySequence) =>
+               {
+                   called++;
+                   var s = enc.Decrypt(readOnlySequence.ToArray()).Decode();
+                   var msg = JsonSerializer.Deserialize<BaseMessage>(s);
+                   Assert.True(msg is TextMessage);
+                   Assert.Equal("text", ((TextMessage)msg).Text);
+               }, TestContext.Current.CancellationToken)) {}
         
         Assert.Equal(3, called);
     }

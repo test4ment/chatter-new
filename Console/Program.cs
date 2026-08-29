@@ -7,7 +7,6 @@ using chatter_crypto;
 using chatter_new.Messaging;
 using chatter_new.Messaging.Connection;
 using chatter_new.Messaging.Messages;
-using chatter_new.Messaging.Session;
 
 Console.InputEncoding = Encoding.Unicode;
 Console.OutputEncoding = Encoding.Unicode;

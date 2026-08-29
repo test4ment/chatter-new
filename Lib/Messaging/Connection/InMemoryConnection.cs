@@ -100,8 +100,6 @@ public class InMemoryConnection : IConnection, IConnectionAsync
 
     public async Task<int> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        if (buffer.IsEmpty) return 0;
-
         await _signal.WaitAsync(cancellationToken);
 
         int copied = 0;

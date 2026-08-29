@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 
 namespace chatter_crypto;
 
+// TODO: key cycling
 public class DHKeyExchange: IDisposable
 {
     private ECDiffieHellman dh_inst = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP521);
