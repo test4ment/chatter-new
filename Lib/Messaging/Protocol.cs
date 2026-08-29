@@ -1,143 +1,162 @@
 using System.Buffers;
 using System.IO.Pipelines;
+using System.Runtime.CompilerServices;
 using chatter_new.Messaging.Connection;
 
 namespace chatter_new.Messaging;
 
-public class Protocol(IConnectionAsync connection)
+public class Protocol(IConnectionAsync connection) : IAsyncDisposable
 {
-    private readonly SemaphoreSlim semaphore = new(1, 1);
-    private Pipe recvPipe = new();
-    // private const int bufferSize = 4096;
-    
+    private const int ReadChunkSize = 4096;
+
+    private readonly SemaphoreSlim sendGate = new(1, 1);
+    private readonly SemaphoreSlim receiveGate = new(1, 1);
+    private readonly SemaphoreSlim readGate = new(1, 1);
+    private readonly Pipe recvPipe = new(new PipeOptions(
+        pauseWriterThreshold: 1 << 20,      // 1 MiB
+        resumeWriterThreshold: 1 << 19));   // 0.5 MiB
+
+    private bool endOfStream;
+
     public async Task Send(byte[] data, CancellationToken cancellationToken = default)
     {
-        await semaphore.WaitAsync(cancellationToken);
-        try {
-            // await send size
-            await connection.SendAsync(data.Length.Encode(), cancellationToken);
-            await connection.SendAsync(data, cancellationToken);
-        }
-        finally {
-            semaphore.Release();
-        }
-    }
-    private static bool TryParseBuffer(ref ReadOnlySequence<byte> buffer, Action<ReadOnlySequence<byte>> callback)
-    {
-        if(buffer.Length < sizeof(int)) return false;
-        var pendingLen = buffer.Slice(0, sizeof(int)).DecodeInt();
-            
-        if(buffer.Length - sizeof(int) < pendingLen) return false;
-
-        callback(buffer.Slice(sizeof(int), pendingLen));
-            
-        buffer = buffer.Slice(pendingLen + sizeof(int));
-
-        return true;
-    }
-    
-    public async Task<int> Receive(CancellationToken ct = default)
-    {
-        var writer = recvPipe.Writer;
-        
-        var recv = await connection.ReceiveAsync(writer.GetMemory(connection.Available), ct);
-        
-        if (recv == 0)
-            await writer.CompleteAsync();
-        
-        writer.Advance(recv);
-        
-        await writer.FlushAsync(ct);
-        return recv;
-    }
-
-    public async Task<IList<byte[]>?> GetFrameCopies(CancellationToken ct = default)
-    {
-        var reader = recvPipe.Reader;
-
-        ReadResult r;
+        await sendGate.WaitAsync(cancellationToken);
         try
         {
-            r = await reader.ReadAsync(ct);
-        } 
-        catch (OperationCanceledException) {
-            return null;
+            await SendAllAsync(data.Length.Encode(), cancellationToken);
+            await SendAllAsync(data, cancellationToken);
         }
-        var b = r.Buffer;
+        finally
+        {
+            sendGate.Release();
+        }
+    }
 
-        var res = new List<byte[]>();
-        try {
-            while (!ct.IsCancellationRequested) {
-                if (!TryParseBuffer(
-                        ref b, 
-                        seq => res.Add(seq.ToArray()))
-                    ) break;
+    private async Task SendAllAsync(byte[] data, CancellationToken cancellationToken)
+    {
+        var offset = 0;
+        while (offset < data.Length)
+        {
+            var sent = await connection.SendAsync(data, offset, data.Length - offset, cancellationToken);
+            if (sent <= 0)
+                throw new IOException("Connection closed before the frame was fully sent.");
+            offset += sent;
+        }
+    }
+
+    public async Task<int> Receive(CancellationToken ct = default)
+    {
+        if (endOfStream) return 0;
+
+        await receiveGate.WaitAsync(ct);
+        try
+        {
+            if (endOfStream) return 0;
+
+            var writer = recvPipe.Writer;
+            var received = await connection.ReceiveAsync(writer.GetMemory(ReadChunkSize), ct);
+
+            if (received == 0)
+            {
+                endOfStream = true;
+                await writer.CompleteAsync();
+                return 0;
+            }
+
+            writer.Advance(received);
+            await writer.FlushAsync(ct);
+            return received;
+        }
+        finally
+        {
+            receiveGate.Release();
+        }
+    }
+
+    public async Task<byte[]?> ReadNextFrameAsync(CancellationToken ct = default)
+    {
+        await readGate.WaitAsync(ct);
+        try
+        {
+            var reader = recvPipe.Reader;
+
+            while (true)
+            {
+                if (reader.TryRead(out var r))
+                {
+                    var buffer = r.Buffer;
+
+                    if (FrameDecoder.TryReadFrame(
+                            buffer,
+                            out var frame,
+                            out var consumed,
+                            out var examined))
+                    {
+                        var result = frame.ToArray();
+                        reader.AdvanceTo(consumed, examined);
+                        return result;
+                    }
+
+                    reader.AdvanceTo(buffer.Start, buffer.End);
+
+                    if (r.IsCompleted || endOfStream)
+                        return null;
+                }
+                else if (endOfStream)
+                {
+                    return null;
+                }
+
+                await Receive(ct);
             }
         }
-        finally {
-            reader.AdvanceTo(b.Start, r.Buffer.End);
+        finally
+        {
+            readGate.Release();
         }
-        
-        return res;
     }
 
-    public async Task<byte[]> GetNextFrame(CancellationToken ct = default)
+    public bool TryReadNextFrame(out byte[]? frame)
     {
-        byte[]? result = null;
-        
-        while (!await ProcessNextFrame(sequence => result = sequence.ToArray(), ct)) { }
-        
-        return result!;
-    }
-    
-    public bool TryGetNextFrame(out byte[]? res)
-    {
-        byte[]? result = null;
-        if (TryProcessNextFrame(sequence => { result = sequence.ToArray(); }))
+        var reader = recvPipe.Reader;
+
+        if (!reader.TryRead(out var r) || r.Buffer.IsEmpty)
         {
-            res = result;
+            frame = null;
+            return false;
+        }
+
+        var buffer = r.Buffer;
+        if (FrameDecoder.TryReadFrame(buffer, out var slice, out var consumed, out var examined))
+        {
+            reader.AdvanceTo(consumed, examined);
+            frame = slice.ToArray();
             return true;
         }
-        res = null;
+
+        reader.AdvanceTo(buffer.Start, buffer.End);
+        frame = null;
         return false;
     }
-    
-    public bool TryProcessNextFrame(Action<ReadOnlySequence<byte>> callback)
+
+    public async IAsyncEnumerable<byte[]> ReadFramesAsync([EnumeratorCancellation] CancellationToken ct = default)
     {
-        var reader = recvPipe.Reader;
+        while (true)
+        {
+            var frame = await ReadNextFrameAsync(ct);
+            if (frame is null)
+                yield break;
 
-        var succ = reader.TryRead(out var r);
-        if (!succ) return false;
-        
-        var b = r.Buffer;
-
-        try {
-            return TryParseBuffer(ref b, callback);
-        }
-        finally {
-            reader.AdvanceTo(b.Start, r.Buffer.End);
+            yield return frame;
         }
     }
 
-    public async Task<bool> ProcessNextFrame(Action<ReadOnlySequence<byte>> callback, CancellationToken ct = default)
+    public async ValueTask DisposeAsync()
     {
-        var reader = recvPipe.Reader;
-
-        ReadResult r;
-        try {
-            r = await reader.ReadAsync(ct);
-        }
-        catch (OperationCanceledException) {
-            return false; 
-        }
-        
-        var b = r.Buffer;
-
-        try {
-            return TryParseBuffer(ref b, callback);
-        }
-        finally {
-            reader.AdvanceTo(b.Start, b.Start);
-        }
+        await recvPipe.Writer.CompleteAsync();
+        recvPipe.Reader.Complete();
+        sendGate.Dispose();
+        receiveGate.Dispose();
+        readGate.Dispose();
     }
 }

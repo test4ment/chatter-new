@@ -1,4 +1,3 @@
-using chatter_crypto;
 using chatter_new.Messaging;
 using chatter_new.Messaging.Connection;
 
@@ -17,22 +16,6 @@ public class HandshakeExample
         var bob = new DHHandshake(bobProto);
 
         var ct = TestContext.Current.CancellationToken;
-        var timed = new CancellationTokenSource(TimeSpan.FromMilliseconds(100)).Token;
-
-        _ = Task.Run(async () =>
-        {
-            while (!timed.IsCancellationRequested)
-            {
-                await aliceProto.Receive(timed);
-            }
-        }, TestContext.Current.CancellationToken);
-        _ = Task.Run(async () =>
-        {
-            while (!timed.IsCancellationRequested)
-            {
-                await bobProto.Receive(timed);
-            }
-        }, TestContext.Current.CancellationToken);
         var results = await Task.WhenAll(alice.Perform(ct), bob.Perform(ct));
 
         var msg = "hello handshake"u8.ToArray();

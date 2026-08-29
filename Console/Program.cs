@@ -1,5 +1,4 @@
-﻿using System.Buffers;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -56,11 +55,6 @@ switch (key) {
 }
 
 var tok = new CancellationTokenSource();
-_ = Task.Run((async Task () => {
-    while (!tok.IsCancellationRequested) {
-        await sess.Receive(tok.Token);
-    }
-})!);
 
 Console.WriteLine("Sending handshake");
 enc = await new DHHandshake(sess).Perform();
@@ -69,15 +63,15 @@ await sess.Send(PrepareMsg(new UserInfoMessage(username)));
 Console.WriteLine("Sent username");
 
 var msgQueue = new ConcurrentQueue<byte[]>();
-_ = Task.Run((async Task () =>
+_ = Task.Run(async () =>
 {
-    while (!tok.IsCancellationRequested) {
-        await sess.ProcessNextFrame(
-            sequence => msgQueue.Enqueue(sequence.ToArray()),
-            tok.Token
-        );
+    try
+    {
+        await foreach (var frame in sess.ReadFramesAsync(tok.Token))
+            msgQueue.Enqueue(frame);
     }
-})!, tok.Token);
+    catch (OperationCanceledException) { }
+}, tok.Token);
 
 bool running = true;
 Console.CancelKeyPress += (_, __) =>

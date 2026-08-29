@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Text.Json;
 using chatter_crypto;
 using chatter_new.Messaging;
@@ -28,15 +27,16 @@ public class SessionTest
         Assert.Equal(read, (payload.Length + sizeof(int)) * 3);
         
         int called = 0;
-        var cancellationToken = new CancellationTokenSource(TimeSpan.FromMilliseconds(50)).Token;
-        while (await sess2.ProcessNextFrame((readOnlySequence) =>
-               {
-                   called++;
-                   var s = readOnlySequence.ToArray().Decode();
-                   var msg = JsonSerializer.Deserialize<BaseMessage>(s);
-                   Assert.True(msg is TextMessage);
-                   Assert.Equal("text", ((TextMessage)msg).Text);
-               }, cancellationToken)) {}
+        for (var i = 0; i < 3; i++)
+        {
+            var frame = await sess2.ReadNextFrameAsync(TestContext.Current.CancellationToken);
+            Assert.NotNull(frame);
+            called++;
+            var s = frame!.Decode();
+            var msg = JsonSerializer.Deserialize<BaseMessage>(s);
+            Assert.True(msg is TextMessage);
+            Assert.Equal("text", ((TextMessage)msg).Text);
+        }
         
         Assert.Equal(3, called);
     }
@@ -60,14 +60,16 @@ public class SessionTest
         Assert.Equal(read, (payload.Length + sizeof(int)) * 3);
         
         int called = 0;
-        while (await sess2.ProcessNextFrame((readOnlySequence) =>
-               {
-                   called++;
-                   var s = enc.Decrypt(readOnlySequence.ToArray()).Decode();
-                   var msg = JsonSerializer.Deserialize<BaseMessage>(s);
-                   Assert.True(msg is TextMessage);
-                   Assert.Equal("text", ((TextMessage)msg).Text);
-               }, TestContext.Current.CancellationToken)) {}
+        for (var i = 0; i < 3; i++)
+        {
+            var frame = await sess2.ReadNextFrameAsync(TestContext.Current.CancellationToken);
+            Assert.NotNull(frame);
+            called++;
+            var s = enc.Decrypt(frame!).Decode();
+            var msg = JsonSerializer.Deserialize<BaseMessage>(s);
+            Assert.True(msg is TextMessage);
+            Assert.Equal("text", ((TextMessage)msg).Text);
+        }
         
         Assert.Equal(3, called);
     }

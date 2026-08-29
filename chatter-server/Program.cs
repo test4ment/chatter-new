@@ -1,5 +1,4 @@
-﻿using System.Buffers;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -53,12 +52,6 @@ _ = Task.Run(async () =>
         {
             var sess = new Protocol(connection);
 
-            _ = Task.Run(async () => {
-                while (!tokenHolder.IsCancellationRequested) {
-                    await sess.Receive();
-                }
-            });
-            
             Console.WriteLine($"[{id}] Client connected, performing handshake");
             var enc = await new DHHandshake(sess).Perform(tokenHolder.Token);
             Console.WriteLine($"[{id}] Handshake complete");
@@ -69,13 +62,12 @@ _ = Task.Run(async () =>
             var msgQueue = new ConcurrentQueue<byte[]>();
             _ = Task.Run(async () =>
             {
-                while (!tokenHolder.IsCancellationRequested)
+                try
                 {
-                    await sess.ProcessNextFrame(
-                        sequence => msgQueue.Enqueue(sequence.ToArray()),
-                        tokenHolder.Token
-                    );
+                    await foreach (var frame in sess.ReadFramesAsync(tokenHolder.Token))
+                        msgQueue.Enqueue(frame);
                 }
+                catch (OperationCanceledException) { }
             }, tokenHolder.Token);
 
             string username = $"client{id}";
