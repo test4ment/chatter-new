@@ -182,18 +182,25 @@ while (running)
         if (!msgQueue.TryDequeue(out var fmsg)) continue;
         
         var msg = ProcessMsg(fmsg);
-        
-        if (msg is TextMessage tmsg)
-        {
-            Console.WriteLine(nick + ": " + tmsg.Text);
-        }
 
-        if (msg is SystemMessage { Type: SystemMessage.SysMsgType.Left })
-        {
-            Console.WriteLine($"{nick} has left. Exiting...");
-            running = false;
-        }
+        HandleMessage(msg);
     }
 
     await Task.Delay(16);
+}
+
+void HandleMessage(BaseMessage msg) {
+    switch (msg) {
+        case RetransmittedMessage rmsg:
+            if (rmsg.Msg is TextMessage tmsgi) 
+                Console.WriteLine(rmsg.OriginalSender + ": " + tmsgi.Text);
+            break;
+        case TextMessage tmsg:
+            Console.WriteLine(nick + ": " + tmsg.Text);
+            break;
+        case SystemMessage { Type: SystemMessage.SysMsgType.Left }:
+            Console.WriteLine($"{nick} has left. Exiting...");
+            running = false;
+            break;
+    }
 }

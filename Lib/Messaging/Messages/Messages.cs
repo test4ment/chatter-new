@@ -7,6 +7,7 @@ namespace chatter_new.Messaging.Messages;
 [JsonDerivedType(typeof(UserInfoMessage), "userinfo")]
 [JsonDerivedType(typeof(SystemMessage), "system")]
 [JsonDerivedType(typeof(BLOBMessage), "blob")]
+[JsonDerivedType(typeof(RetransmittedMessage), "retransmitted")]
 public abstract class BaseMessage
 {
     public string Serialize()
@@ -49,4 +50,11 @@ public class BLOBMessage(byte[] data, string filename) : BaseMessage
 {
     public byte[] Data { get; init; } = data;
     public string Filename { get; init; } = filename;
+}
+
+[method: JsonConstructor]
+public class RetransmittedMessage(string originalSender, BaseMessage msg) : BaseMessage
+{
+    public string OriginalSender { get; init; } = originalSender;
+    public BaseMessage Msg { get; init; } = msg;
 }
