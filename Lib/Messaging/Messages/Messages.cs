@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using chatter_new.Messaging.Datastream;
 
 namespace chatter_new.Messaging.Messages;
 
@@ -8,6 +9,7 @@ namespace chatter_new.Messaging.Messages;
 [JsonDerivedType(typeof(SystemMessage), "system")]
 [JsonDerivedType(typeof(BLOBMessage), "blob")]
 [JsonDerivedType(typeof(RetransmittedMessage), "retransmitted")]
+[JsonDerivedType(typeof(ChunkedBlob), "cblob")]
 public abstract class BaseMessage
 {
     public string Serialize()
