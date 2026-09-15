@@ -25,6 +25,7 @@ public static class FrameDecoder
     {
         var headerStart = reader.Consumed;
         
+        // TODO: add max frame size settings, exception on exceed
         if (!reader.TryReadBigEndian(out int length)) // reference BytesHelper
         {
             frame = default;
