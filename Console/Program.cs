@@ -250,14 +250,11 @@ async Task RunChatAsync(Protocol sess, UniversalEncryption enc, string remoteNam
         var msg = ProcessMsg(frame, enc);
         if (msg is SystemMessage { Type: SystemMessage.SysMsgType.Left }) {
             chat.AddSysMessage($"{remoteName} has left.");
-            await SendLeaveAsync(sess, enc);
             await Task.Delay(1500, appCtx);
             break;
         }
         HandleMessage(msg, remoteName);
     }
-
-    chat.AddSysMessage($"{remoteName} closed the connection.");
 }
 
 void HandleMessage(BaseMessage msg, string sender) {
