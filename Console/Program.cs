@@ -96,7 +96,6 @@ void Menu(string input, State state) {
 }
 
 void ConnectAddress(string input, State state) {
-    
     @base.SetText(
         "Connect to address\n\n" +
         $"Enter IP or IP:port (default port: {defaultPort}).\n" +
@@ -237,12 +236,11 @@ async Task RunChatAsync(Protocol sess, UniversalEncryption enc, string remoteNam
         }
     };
     chat.OnEnter += chatOnEnter;
-
+    
     Console.CancelKeyPress += async (_, e) => {
-        if (appCts.IsCancellationRequested) return;
-        await SendLeaveAsync(sess, enc);
-        appCts.Cancel();
         e.Cancel = true;
+        if (appCts.IsCancellationRequested) return;
+        await SendLeaveAsync(sess, enc).ContinueWith(_ => appCts.Cancel());
     };
 
     nav.Show(chatScreen);
