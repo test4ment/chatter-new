@@ -52,7 +52,7 @@ void ShowMenu() {
         $"Chatter\nHello {username}!\n\n" +
         $"1. Connect to localhost:{defaultPort}\n" +
         "2. Connect to localhost:16777\n" +
-        $"3. Listen on localhost:{defaultPort}\n" +
+        $"3. Listen on any:{defaultPort}\n" +
         "4. Connect to address\n" +
         "5. Settings\n");
 }
@@ -77,7 +77,7 @@ void Menu(string input, State state) {
         case "3":
             _ = RunSessionAsync(
                 CancellationToken =>
-                    SocketConnection.ListenAndAwaitClient(new IPEndPoint(IPAddress.Loopback, defaultPort), CancellationToken),
+                    SocketConnection.ListenAndAwaitClient(new IPEndPoint(IPAddress.Any, defaultPort), CancellationToken),
                 appCtx);
             break;
         case "4":
