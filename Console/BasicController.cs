@@ -32,8 +32,10 @@ internal class BasicController {
     public static BasicController Create(IReadOnlyCollection<IInputListener> inputListeners,
         VerticalStackPanel textPan,
         TextBoxFacade userInput) {
-        var i = new BasicController(inputListeners, textPan, userInput);
+        var ctrlBspace = new CtrlBspace(userInput.Input);
+        var i = new BasicController([ctrlBspace, ..inputListeners], textPan, userInput);
         i.enter.OnEnter += i.ReadLine;
+        
         return i;
     }
 

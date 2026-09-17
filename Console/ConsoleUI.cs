@@ -12,12 +12,12 @@ public static class ConsoleUI {
         ConsoleManager.Setup();
     }
     
-    internal static BasicController BasicIOLayout() {
+    internal static (IControl, BasicController) BasicIOLayout() {
         var (control, textBoxFacade) = CreateTextbox();
 
         var textPan = new VerticalStackPanel() { };
         
-        ConsoleManager.Content = new DockPanel() {
+        var root = new DockPanel() {
             Placement = DockPanel.DockedControlPlacement.Top,
             DockedControl = new VerticalStackPanel() {
                 Children = new Control[] {
@@ -37,10 +37,10 @@ public static class ConsoleUI {
         
         IInputListener[] inputListeners = [textBoxFacade.Input];
         
-        return BasicController.Create(inputListeners, textPan, textBoxFacade);
+        return (root, BasicController.Create(inputListeners, textPan, textBoxFacade));
     }
     
-    internal static ChatController ChattingUI() {
+    internal static (IControl, ChatController) ChattingUI() {
         var msgs = new VerticalStackPanel() {
             Children = new Control[] { }
         };
@@ -67,7 +67,7 @@ public static class ConsoleUI {
         var tbox = CreateTextbox();
         var bottomInfo = new TextBlock(){Text = ""};
     
-        ConsoleManager.Content = new DockPanel() {
+        var root = new DockPanel() {
             Placement = DockPanel.DockedControlPlacement.Top,
             DockedControl = new VerticalStackPanel() {
                 Children = new Control[] {
@@ -89,13 +89,13 @@ public static class ConsoleUI {
         
         var inputs = new List<IInputListener> { scrollPanel, tbox.textBoxFacade.Input };
 
-        return ChatController.Create(inputs, msgs, tbox.textBoxFacade, scrollPanel, () => {
-            marg.Offset = new Offset(0, 
-                Math.Max(msgList.Size.Height - msgs.Size.Height - 1, 0), 
+        return (root, ChatController.Create(inputs, msgs, tbox.textBoxFacade, scrollPanel, () => {
+            marg.Offset = new Offset(0,
+                Math.Max(msgList.Size.Height - msgs.Size.Height - 1, 0),
                 0, 0);
 
             bottomInfo.Text = $"{DateTime.Now:T} \t Type /help to list commands";
-        });
+        }));
     }
 
     internal static (Control Control, TextBoxFacade textBoxFacade) CreateTextbox() {

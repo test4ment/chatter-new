@@ -30,8 +30,10 @@ internal class ChatController {
     public static ChatController Create(IReadOnlyCollection<IInputListener> inputListeners, 
         VerticalStackPanel msgCollection, TextBoxFacade userInput, VerticalScrollPanel scrollPanel, Action? tick = null) {
         var enterHandler = new EnterInput();
+        var ctrlBspace = new CtrlBspace(userInput.Input);
         var chatController =
-            new ChatController([enterHandler, ..inputListeners], msgCollection, userInput, scrollPanel, tick);
+            new ChatController([enterHandler, ctrlBspace, ..inputListeners], msgCollection, userInput, 
+                scrollPanel, tick);
         enterHandler.OnEnter += () => chatController.OnEnter?.Invoke(chatController.Text);
 
         return chatController;

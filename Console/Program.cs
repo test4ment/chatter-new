@@ -1,15 +1,61 @@
 ﻿using chatter_new_console;
+using System.Collections.Concurrent;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using chatter_crypto;
+using chatter_new.Messaging;
+using chatter_new.Messaging.Connection;
+using chatter_new.Messaging.Messages;
+
 
 // TODO: LLM security review
-// ConsoleUI.ChattingUI();
-var c = ConsoleUI.BasicIOLayout();
+Console.InputEncoding = Encoding.Unicode;
+Console.OutputEncoding = Encoding.Unicode;
 
-void Options(string input) {
-    c.AddMsg("Not implemented yet!");
+var (baseUI, @base) = ConsoleUI.BasicIOLayout();
+var (chatUI, chat) = ConsoleUI.ChattingUI();
+var nav = new ScreenNavigator();
+var menuScreen = new Screen(baseUI, @base.Tick);
+var chatScreen = new Screen(chatUI, chat.Tick);
+
+var appState = new State(Start);
+var username = RandomUsername.Generate();
+
+var tok = new CancellationTokenSource();
+
+nav.Show(menuScreen);
+Start("", appState);
+
+@base.OnEnter += appState.Handle;
+chat.OnEnter += appState.Handle;
+
+while (true) {
+    await Task.Delay(16, tok.Token);
+    nav.Tick();
 }
 
-void Start(string input) {
-    c.SetText(
+void Options(string input, State state) {
+    @base.SetText("0. Back\n"+
+                  "1. Change username");
+
+    switch (input.Trim()) {
+        case "0":
+            state.ChangeState(Start);
+            Start("", state);
+            break;
+        case "1":
+            username = RandomUsername.Generate();
+            @base.AddMsg("New username: " + username);
+            break;
+        default:
+            @base.BlinkUserInput();
+            break;
+    }
+}
+
+void Start(string input, State state) {
+    @base.SetText(
         // todo: move into tests
         "1. Client connect to localhost:50001\n" +
         "2. Client connect to localhost:16777\n" +
@@ -20,102 +66,57 @@ void Start(string input) {
     if (string.IsNullOrWhiteSpace(input)) return;
     switch (input.Trim()) {
         case "1":
+            nav.Show(chatScreen);
+            var p = ConnectTo(50001).Result;
+            
             break;
         case "2":
+            nav.Show(chatScreen);
             break;
         case "3":
+            nav.Show(chatScreen);
+            var p2 = Listen(50001).Result;
+            
             break;
         case "4":
+            nav.Show(chatScreen);
             break;
         case "5":
-            Options(input);
-            c.BlinkUserInput();
+            state.ChangeState(Options);
+            Options(input, state);
+            @base.BlinkUserInput();
             break;
         default:
-            c.BlinkUserInput();
+            @base.BlinkUserInput();
             break;
     }
 }
 
-Start("");
-
-c.OnEnter += Start;
-// c.OnEnter += s => {
-//     c.SetText("You entered: " + s);
-//     if (s == "shit") {
-//         c.AddMsg("No swearing allowed!");
-//         c.BlinkUserInput();
-//     }
-//     else {
-//         c.SetInputText(string.Empty);
-//         c.AddMsg(string.Empty);
-//     }
-// };
-
-while (true) {
-    Thread.Sleep(16);
-    c.Tick();
+async Task<Protocol> ConnectTo(int port) {
+    var ip = new IPEndPoint(IPAddress.Loopback, port);
+    chat.AddSysMessage($"Connecting...");
+    var sess = new Protocol(await SocketConnection.ConnectTo(ip));
+    chat.AddSysMessage($"Connected to {ip}");
+    return sess;
 }
 
-//
-// using System.Collections.Concurrent;
-// using System.Net;
-// using System.Text;
-// using System.Text.Json;
-// using chatter_crypto;
-// using chatter_new.Messaging;
-// using chatter_new.Messaging.Connection;
-// using chatter_new.Messaging.Messages;
-//
-// Console.InputEncoding = Encoding.Unicode;
-// Console.OutputEncoding = Encoding.Unicode;
-//
-// Console.WriteLine("Hello, World!");
-// Console.WriteLine("1. Client connect to localhost:50001");
-// Console.WriteLine("2. Client connect to localhost:16777");
-// Console.WriteLine("3. Server listen at localhost:50001");
-//
-// var ip = new IPEndPoint(IPAddress.Loopback, 50001);
-// Protocol sess;
-// UniversalEncryption enc;
-//
-// var key = Console.ReadKey(true).Key;
-//
-// byte[] PrepareMsg(BaseMessage msg) {
-//     return enc.Encrypt(msg.Serialize().Encode());
-// }
-//
-// BaseMessage ProcessMsg(byte[] msg)
-// {
-//     return JsonSerializer.Deserialize<BaseMessage>(enc.Decrypt(msg).Decode())!;
-// }
-//
-// string username = "connector";
-// switch (key) {
-//     case ConsoleKey.D1:
-//         Console.WriteLine("Connect mode");
-//         sess = new Protocol(await SocketConnection.ConnectTo(ip));
-//         Console.WriteLine("Connected");
-//         break;
-//     case ConsoleKey.D2:
-//         ip = new IPEndPoint(IPAddress.Loopback, 16777);
-//         Console.WriteLine("Connect mode");
-//         sess = new Protocol(await SocketConnection.ConnectTo(ip));
-//         Console.WriteLine("Connected");
-//         break;
-//     case ConsoleKey.D3:
-//         Console.WriteLine("Await mode");
-//         sess = new Protocol(await SocketConnection.ListenAndAwaitClient(ip));
-//         username = "listener";
-//         Console.WriteLine("Client connected");
-//         break;
-//     default:
-//         return;
-//         break;
-// }
-//
-// var tok = new CancellationTokenSource();
-//
+async Task<Protocol> Listen(int port) {
+    var ip = new IPEndPoint(IPAddress.Loopback, port);
+    chat.AddSysMessage($"Waiting for connections...");
+    var sess = new Protocol(await SocketConnection.ListenAndAwaitClient(ip));
+    chat.AddSysMessage($"Client connected");
+    return sess;
+}
+
+
+byte[] PrepareMsg(BaseMessage msg, UniversalEncryption enc) {
+    return enc.Encrypt(msg.Serialize().Encode());
+}
+
+BaseMessage ProcessMsg(byte[] msg, UniversalEncryption enc) {
+    return JsonSerializer.Deserialize<BaseMessage>(enc.Decrypt(msg).Decode())!;
+}
+
 // Console.WriteLine("Sending handshake");
 // enc = await new DHHandshake(sess).Perform();
 // Console.WriteLine("Got handshake, sending username");
@@ -241,7 +242,7 @@ while (true) {
 //
 //     await Task.Delay(16);
 // }
-//
+
 // void HandleMessage(BaseMessage msg) {
 //     switch (msg) {
 //         case RetransmittedMessage rmsg:
