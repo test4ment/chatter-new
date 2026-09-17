@@ -1,5 +1,4 @@
 ﻿using chatter_new_console;
-using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -8,45 +7,110 @@ using chatter_new.Messaging;
 using chatter_new.Messaging.Connection;
 using chatter_new.Messaging.Messages;
 
-
 // TODO: LLM security review
+
 Console.InputEncoding = Encoding.Unicode;
 Console.OutputEncoding = Encoding.Unicode;
 
 var (baseUI, @base) = ConsoleUI.BasicIOLayout();
 var (chatUI, chat) = ConsoleUI.ChattingUI();
+
 var nav = new ScreenNavigator();
 var menuScreen = new Screen(baseUI, @base.Tick);
 var chatScreen = new Screen(chatUI, chat.Tick);
 
-var appState = new State(Start);
-var username = RandomUsername.Generate();
+var appCts = new CancellationTokenSource();
+var appCtx = appCts.Token;
 
-var tok = new CancellationTokenSource();
+var username = RandomUsername.Generate();
+Action<string>? chatOnEnter = null;
+var shouldExit = false;
+
+var appState = new State(Menu);
 
 nav.Show(menuScreen);
-Start("", appState);
+ShowMenu();
 
 @base.OnEnter += appState.Handle;
-chat.OnEnter += appState.Handle;
+
+Console.CancelKeyPress += (_, e) => {
+    if (appCts.IsCancellationRequested) return;
+    e.Cancel = true;
+    appCts.Cancel();
+};
 
 while (true) {
-    await Task.Delay(16, tok.Token);
     nav.Tick();
+    try {
+        await Task.Delay(16, appCtx);
+    }
+    catch (OperationCanceledException) {
+        break;
+    }
 }
 
-void Options(string input, State state) {
-    @base.SetText("0. Back\n"+
-                  "1. Change username");
+void ShowMenu() {
+    nav.Show(menuScreen);
+    @base.SetText(
+        // todo: move into tests
+        $"Chatter\nYou are {username}\n\n" +
+        "1. Connect to localhost:50001\n" +
+        "2. Connect to localhost:16777\n" +
+        "3. Listen on localhost:50001\n" +
+        "4. Settings");
+}
+
+void Menu(string input, State state) {
+    if (string.IsNullOrWhiteSpace(input.Trim())) {
+        @base.BlinkUserInput();
+        return;
+    }
 
     switch (input.Trim()) {
-        case "0":
-            state.ChangeState(Start);
-            Start("", state);
+        case "1":
+            _ = RunSessionAsync(
+                CancellationToken =>
+                    SocketConnection.ConnectTo(new IPEndPoint(IPAddress.Loopback, 50001), CancellationToken), appCtx);
             break;
+        case "2":
+            _ = RunSessionAsync(
+                CancellationToken =>
+                    SocketConnection.ConnectTo(new IPEndPoint(IPAddress.Loopback, 16777), CancellationToken), appCtx);
+            break;
+        case "3":
+            _ = RunSessionAsync(
+                CancellationToken =>
+                    SocketConnection.ListenAndAwaitClient(new IPEndPoint(IPAddress.Loopback, 50001), CancellationToken),
+                appCtx);
+            break;
+        case "4":
+            state.ChangeState(Settings);
+            Settings("", state);
+            break;
+        default:
+            @base.BlinkUserInput();
+            break;
+    }
+}
+
+void Settings(string input, State state) {
+    @base.SetText(
+        "Settings\n\n" +
+        $"Username: {username}\n\n" +
+        "1. Regenerate username\n" +
+        "0. Back");
+
+    if (string.IsNullOrWhiteSpace(input.Trim())) return;
+
+    switch (input.Trim()) {
         case "1":
             username = RandomUsername.Generate();
             @base.AddMsg("New username: " + username);
+            Settings("", state);
+            break;
+        case "0":
+            state.ChangeState(Menu);
+            ShowMenu();
             break;
         default:
             @base.BlinkUserInput();
@@ -54,207 +118,142 @@ void Options(string input, State state) {
     }
 }
 
-void Start(string input, State state) {
-    @base.SetText(
-        // todo: move into tests
-        "1. Client connect to localhost:50001\n" +
-        "2. Client connect to localhost:16777\n" +
-        "3. Server listen at localhost:50001\n" +
-        "4. Connect\n" +
-        "5. Options\n");
+async Task RunSessionAsync(Func<CancellationToken, Task<SocketConnection>> open, CancellationToken appCtx) {
+    Protocol? sess = null;
+    try {
+        using var sessionCts = CancellationTokenSource.CreateLinkedTokenSource(appCtx);
+        var sessionCtx = sessionCts.Token;
 
-    if (string.IsNullOrWhiteSpace(input)) return;
-    switch (input.Trim()) {
-        case "1":
-            nav.Show(chatScreen);
-            var p = ConnectTo(50001).Result;
-            
+        nav.Show(chatScreen);
+        chat.AddSysMessage($"Connecting...");
+
+        var conn = await open(sessionCtx);
+        sess = new Protocol(conn);
+        chat.AddSysMessage($"Connected");
+
+        chat.AddSysMessage($"Handshaking...");
+        var enc = await new DHHandshake(sess).Perform(sessionCtx);
+        await sess.Send(PrepareMsg(new UserInfoMessage(username), enc), sessionCtx);
+
+        chat.AddSysMessage("Waiting for remote username...");
+        var remoteName = await ReadRemoteNameAsync(sess, enc, sessionCtx);
+        if (remoteName is null) {
+            chat.AddSysMessage("Connection closed before the remote announced a username.");
+            return;
+        }
+
+        await RunChatAsync(sess, enc, remoteName, sessionCtx);
+    }
+    catch (OperationCanceledException) {
+    }
+    catch (Exception e) {
+        if (!appCtx.IsCancellationRequested) {
+            chat.AddSysMessage("Session error: " + e.Message);
+            try {
+                await Task.Delay(1500, appCtx);
+            }
+            catch (OperationCanceledException) {
+            }
+        }
+    }
+    finally {
+        if (sess != null) {
+            await sess.DisposeAsync();
+            sess = null;
+        }
+        if (!appCtx.IsCancellationRequested) {
+            DetachChatInput();
+            ShowMenu();
+        }
+    }
+}
+
+async Task<string?> ReadRemoteNameAsync(Protocol sess, UniversalEncryption enc, CancellationToken ct) {
+    while (true) {
+        var frame = await sess.ReadNextFrameAsync(ct);
+        if (frame is null) return null;
+
+        var msg = ProcessMsg(frame, enc);
+        if (msg is UserInfoMessage userInfo) return userInfo.Name;
+    }
+}
+
+async Task RunChatAsync(Protocol sess, UniversalEncryption enc, string remoteName, CancellationToken ct) {
+    DetachChatInput();
+
+    chatOnEnter = async void (text) => {
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        var trimmed = text.Trim();
+        if (trimmed.StartsWith("/img", StringComparison.Ordinal)) {
+            chat.AddSysMessage("File sending is not implemented yet.");
+            chat.Text = "";
+            return;
+        }
+
+        try {
+            await sess.Send(PrepareMsg(new TextMessage(text), enc), ct);
+            chat.AddMessage(username, text);
+            chat.Text = "";
+            chat.ScrollToBotton();
+        }
+        catch (Exception e) {
+            chat.AddSysMessage("Failed to send: " + e.Message);
+        }
+    };
+    chat.OnEnter += chatOnEnter;
+
+    nav.Show(chatScreen);
+    chat.AddSysMessage($"Connected to {remoteName}. Ctrl+C to leave. /img is not implemented yet.");
+
+    await foreach (var frame in sess.ReadFramesAsync(ct)) {
+        var msg = ProcessMsg(frame, enc);
+        HandleMessage(msg, remoteName);
+    }
+
+    chat.AddSysMessage($"{remoteName} closed the connection.");
+}
+
+void HandleMessage(BaseMessage msg, string sender) {
+    switch (msg) {
+        case TextMessage tmsg:
+            chat.AddMessage(sender, tmsg.Text);
+            chat.ScrollToBotton();
             break;
-        case "2":
-            nav.Show(chatScreen);
+        case SystemMessage { Type: SystemMessage.SysMsgType.Left }:
+            chat.AddSysMessage($"{sender} has left.");
             break;
-        case "3":
-            nav.Show(chatScreen);
-            var p2 = Listen(50001).Result;
-            
+        case UserInfoMessage userInfo:
+            chat.AddSysMessage($"{userInfo.Name} joined the chat.");
             break;
-        case "4":
-            nav.Show(chatScreen);
+        case BLOBMessage blob:
+            chat.AddSysMessage($"Received file '{blob.Filename}' ({blob.Data.Length} bytes): saving not implemented.");
             break;
-        case "5":
-            state.ChangeState(Options);
-            Options(input, state);
-            @base.BlinkUserInput();
+        case RetransmittedMessage rmsg:
+            HandleMessage(rmsg.Msg, rmsg.OriginalSender);
             break;
         default:
-            @base.BlinkUserInput();
+            chat.AddSysMessage("Received an unknown message.");
             break;
     }
 }
 
-async Task<Protocol> ConnectTo(int port) {
-    var ip = new IPEndPoint(IPAddress.Loopback, port);
-    chat.AddSysMessage($"Connecting...");
-    var sess = new Protocol(await SocketConnection.ConnectTo(ip));
-    chat.AddSysMessage($"Connected to {ip}");
-    return sess;
+async void Exit(Protocol sess, UniversalEncryption enc) {
+    await sess.Send(PrepareMsg(new SystemMessage(SystemMessage.SysMsgType.Left), enc));
+    shouldExit = true;
 }
 
-async Task<Protocol> Listen(int port) {
-    var ip = new IPEndPoint(IPAddress.Loopback, port);
-    chat.AddSysMessage($"Waiting for connections...");
-    var sess = new Protocol(await SocketConnection.ListenAndAwaitClient(ip));
-    chat.AddSysMessage($"Client connected");
-    return sess;
+void DetachChatInput() {
+    if (chatOnEnter is not null) {
+        chat.OnEnter -= chatOnEnter;
+        chatOnEnter = null;
+    }
 }
-
 
 byte[] PrepareMsg(BaseMessage msg, UniversalEncryption enc) {
     return enc.Encrypt(msg.Serialize().Encode());
 }
 
-BaseMessage ProcessMsg(byte[] msg, UniversalEncryption enc) {
-    return JsonSerializer.Deserialize<BaseMessage>(enc.Decrypt(msg).Decode())!;
+BaseMessage ProcessMsg(byte[] data, UniversalEncryption enc) {
+    return JsonSerializer.Deserialize<BaseMessage>(enc.Decrypt(data).Decode())!;
 }
-
-// Console.WriteLine("Sending handshake");
-// enc = await new DHHandshake(sess).Perform();
-// Console.WriteLine("Got handshake, sending username");
-// await sess.Send(PrepareMsg(new UserInfoMessage(username)));
-// Console.WriteLine("Sent username");
-//
-// var msgQueue = new ConcurrentQueue<byte[]>();
-// _ = Task.Run(async () =>
-// {
-//     try
-//     {
-//         await foreach (var frame in sess.ReadFramesAsync(tok.Token))
-//             msgQueue.Enqueue(frame);
-//     }
-//     catch (OperationCanceledException) { }
-// }, tok.Token);
-//
-// bool running = true;
-// Console.CancelKeyPress += (_, __) =>
-// {
-//     Console.WriteLine("Exiting...");
-//     sess.Send(PrepareMsg(new SystemMessage(SystemMessage.SysMsgType.Left))).Wait();
-//     running = false;
-//     tok.Cancel();
-// };
-//
-// string nick = "";
-//
-// byte[]? result;
-// Console.WriteLine("Waiting name");
-// while(!msgQueue.TryDequeue(out result) );
-// var r = ProcessMsg(result);
-//
-// if (r is UserInfoMessage userInfo) {
-//     nick = userInfo.Name;
-// }
-// else { 
-//     Console.WriteLine("Unknown payload");
-//     sess.Send(PrepareMsg(new SystemMessage(SystemMessage.SysMsgType.Left))).Wait();
-//     return;
-// }
-//
-//
-// // sess.OnReceive += (sender, msg) =>
-// // {
-// //     
-//     // if (msg is BLOBMessage blob)
-//     // {
-//     //     Console.WriteLine($"Got {blob.Filename} ({blob.Data.Length} bytes)");
-//     //     var path = Path.GetFullPath(blob.Filename);
-//     //     while (File.Exists(path))
-//     //     {
-//     //         var i = 1;
-//     //         path = Path.GetFullPath(Path.GetFileNameWithoutExtension(blob.Filename) + $"-{i}" + Path.GetExtension(blob.Filename));
-//     //         ++i;
-//     //     }
-//     //     Console.WriteLine($"Saving to {path}");
-//     //     try
-//     //     {
-//     //         File.WriteAllBytes(path, blob.Data);
-//     //         Console.WriteLine($"Saved successfully");
-//     //     }
-//     //     catch (Exception e)
-//     //     {
-//     //         Console.WriteLine($"Error: {e.Message}");
-//     //     }
-//     //     
-//     // }
-// // };
-//
-// // int downloaded = 0;
-// // var started = DateTime.Now;
-// // sess.OnMsgProgress += (sender, progress) =>
-// // {
-// //     if(downloaded == 0)
-// //         started = DateTime.Now;
-// //     downloaded = progress.Current;
-// //     Console.Write("\r" + '\t'*5 + "\r");
-// //     if (progress.Current < progress.Total)
-// //     {
-// //         Console.Write(
-// //             $"Downloading blob {progress.Current / (float)progress.Total:P} ({downloaded / 1024f / ((DateTime.Now - started).Seconds + 1)} KiB/s)" + ' ' * 10);
-// //     }
-// //     else
-// //     {
-// //         downloaded = 0;
-// //         Console.WriteLine("Finished!");
-// //     }
-// // };
-//
-// Console.WriteLine("Started main loop");
-// while (running)
-// {
-//     if (Console.KeyAvailable)
-//     {
-//         var inp = Console.ReadLine();
-//         if(inp?.StartsWith("/img") ?? false)
-//         {
-//             Console.WriteLine("File transfer currently unavailable");
-//             // try
-//             // {
-//             //     var path = inp.Split()[1];
-//             //     var fname = Path.GetFileName(path);
-//             //     var bytes = File.ReadAllBytes(path);
-//             //     _ = sess.Send(PrepareMsg(new BLOBMessage(bytes, fname)));
-//             // }
-//             // catch (Exception e)
-//             // {
-//             //     Console.WriteLine($"Error: {e.Message}");
-//             // }
-//         }
-//         else if(!string.IsNullOrEmpty(inp))
-//             _ = sess.Send(PrepareMsg(new TextMessage(inp)));
-//     }
-//
-//     if (!msgQueue.IsEmpty) {
-//         if (!msgQueue.TryDequeue(out var fmsg)) continue;
-//         
-//         var msg = ProcessMsg(fmsg);
-//
-//         HandleMessage(msg);
-//     }
-//
-//     await Task.Delay(16);
-// }
-
-// void HandleMessage(BaseMessage msg) {
-//     switch (msg) {
-//         case RetransmittedMessage rmsg:
-//             if (rmsg.Msg is TextMessage tmsgi) 
-//                 Console.WriteLine(rmsg.OriginalSender + ": " + tmsgi.Text);
-//             break;
-//         case TextMessage tmsg:
-//             Console.WriteLine(nick + ": " + tmsg.Text);
-//             break;
-//         case SystemMessage { Type: SystemMessage.SysMsgType.Left }:
-//             Console.WriteLine($"{nick} has left. Exiting...");
-//             running = false;
-//             break;
-//     }
-// }
