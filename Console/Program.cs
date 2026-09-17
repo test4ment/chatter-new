@@ -13,6 +13,8 @@ using chatter_new.Messaging.Messages;
 Console.InputEncoding = Encoding.Unicode;
 Console.OutputEncoding = Encoding.Unicode;
 
+const int defaultPort = 50001;
+
 var (baseUI, @base) = ConsoleUI.BasicIOLayout();
 var (chatUI, chat) = ConsoleUI.ChattingUI();
 
@@ -47,11 +49,12 @@ void ShowMenu() {
     nav.Show(menuScreen);
     @base.SetText(
         // todo: move into tests
-        $"Chatter\nYou are {username}\n\n" +
-        "1. Connect to localhost:50001\n" +
+        $"Chatter\nHello {username}!\n\n" +
+        $"1. Connect to localhost:{defaultPort}\n" +
         "2. Connect to localhost:16777\n" +
-        "3. Listen on localhost:50001\n" +
-        "4. Settings");
+        $"3. Listen on localhost:{defaultPort}\n" +
+        "4. Connect to address\n" +
+        "5. Settings\n");
 }
 
 void Menu(string input, State state) {
@@ -64,7 +67,7 @@ void Menu(string input, State state) {
         case "1":
             _ = RunSessionAsync(
                 CancellationToken =>
-                    SocketConnection.ConnectTo(new IPEndPoint(IPAddress.Loopback, 50001), CancellationToken), appCtx);
+                    SocketConnection.ConnectTo(new IPEndPoint(IPAddress.Loopback, defaultPort), CancellationToken), appCtx);
             break;
         case "2":
             _ = RunSessionAsync(
@@ -74,10 +77,15 @@ void Menu(string input, State state) {
         case "3":
             _ = RunSessionAsync(
                 CancellationToken =>
-                    SocketConnection.ListenAndAwaitClient(new IPEndPoint(IPAddress.Loopback, 50001), CancellationToken),
+                    SocketConnection.ListenAndAwaitClient(new IPEndPoint(IPAddress.Loopback, defaultPort), CancellationToken),
                 appCtx);
             break;
         case "4":
+            state.ChangeState(ConnectAddress);
+            @base.SetInputText("");
+            ConnectAddress("", state);
+            break;
+        case "5":
             state.ChangeState(Settings);
             Settings("", state);
             break;
@@ -85,6 +93,36 @@ void Menu(string input, State state) {
             @base.BlinkUserInput();
             break;
     }
+}
+
+void ConnectAddress(string input, State state) {
+    
+    @base.SetText(
+        "Connect to address\n\n" +
+        $"Enter IP or IP:port (default port: {defaultPort}).\n" +
+        "0. Cancel");
+
+    if (string.IsNullOrWhiteSpace(input.Trim())) return;
+
+    var line = input.Trim();
+    if (line == "0") {
+        state.ChangeState(Menu);
+        ShowMenu();
+        return;
+    }
+
+    if (!line.Contains(':'))
+        line += $":{defaultPort}";
+
+    if (!IPEndPoint.TryParse(line, out var endpoint)) {
+        @base.AddMsg("Invalid address. Expected IP:port");
+        @base.BlinkUserInput();
+        return;
+    }
+
+    state.ChangeState(Menu);
+    @base.SetInputText("");
+    _ = RunSessionAsync(ct => SocketConnection.ConnectTo(endpoint, ct), appCtx);
 }
 
 void Settings(string input, State state) {
@@ -232,7 +270,6 @@ void HandleMessage(BaseMessage msg, string sender) {
             break;
         case SystemMessage { Type: SystemMessage.SysMsgType.Left }:
             throw new UnreachableException();
-            break;
         case UserInfoMessage userInfo:
             chat.AddSysMessage($"{userInfo.Name} joined the chat.");
             break;
