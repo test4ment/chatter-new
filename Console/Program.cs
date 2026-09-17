@@ -1,4 +1,5 @@
-﻿using chatter_new_console;
+﻿using System.Diagnostics;
+using chatter_new_console;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -24,7 +25,6 @@ var appCtx = appCts.Token;
 
 var username = RandomUsername.Generate();
 Action<string>? chatOnEnter = null;
-var shouldExit = false;
 
 var appState = new State(Menu);
 
@@ -32,12 +32,6 @@ nav.Show(menuScreen);
 ShowMenu();
 
 @base.OnEnter += appState.Handle;
-
-Console.CancelKeyPress += (_, e) => {
-    if (appCts.IsCancellationRequested) return;
-    e.Cancel = true;
-    appCts.Cancel();
-};
 
 while (true) {
     nav.Tick();
@@ -120,6 +114,7 @@ void Settings(string input, State state) {
 
 async Task RunSessionAsync(Func<CancellationToken, Task<SocketConnection>> open, CancellationToken appCtx) {
     Protocol? sess = null;
+    UniversalEncryption? enc = null;
     try {
         using var sessionCts = CancellationTokenSource.CreateLinkedTokenSource(appCtx);
         var sessionCtx = sessionCts.Token;
@@ -132,7 +127,7 @@ async Task RunSessionAsync(Func<CancellationToken, Task<SocketConnection>> open,
         chat.AddSysMessage($"Connected");
 
         chat.AddSysMessage($"Handshaking...");
-        var enc = await new DHHandshake(sess).Perform(sessionCtx);
+        enc = await new DHHandshake(sess).Perform(sessionCtx);
         await sess.Send(PrepareMsg(new UserInfoMessage(username), enc), sessionCtx);
 
         chat.AddSysMessage("Waiting for remote username...");
@@ -157,9 +152,11 @@ async Task RunSessionAsync(Func<CancellationToken, Task<SocketConnection>> open,
         }
     }
     finally {
-        if (sess != null) {
+        if (sess != null && enc != null) {
+            await SendLeaveAsync(sess, enc);
             await sess.DisposeAsync();
             sess = null;
+            enc = null;
         }
         if (!appCtx.IsCancellationRequested) {
             DetachChatInput();
@@ -203,11 +200,24 @@ async Task RunChatAsync(Protocol sess, UniversalEncryption enc, string remoteNam
     };
     chat.OnEnter += chatOnEnter;
 
-    nav.Show(chatScreen);
-    chat.AddSysMessage($"Connected to {remoteName}. Ctrl+C to leave. /img is not implemented yet.");
+    Console.CancelKeyPress += async (_, e) => {
+        if (appCts.IsCancellationRequested) return;
+        await SendLeaveAsync(sess, enc);
+        appCts.Cancel();
+        e.Cancel = true;
+    };
 
+    nav.Show(chatScreen);
+    chat.AddSysMessage($"Connected to {remoteName}. Ctrl+C to leave");
+    
     await foreach (var frame in sess.ReadFramesAsync(ct)) {
         var msg = ProcessMsg(frame, enc);
+        if (msg is SystemMessage { Type: SystemMessage.SysMsgType.Left }) {
+            chat.AddSysMessage($"{remoteName} has left.");
+            await SendLeaveAsync(sess, enc);
+            await Task.Delay(1500, appCtx);
+            break;
+        }
         HandleMessage(msg, remoteName);
     }
 
@@ -221,7 +231,7 @@ void HandleMessage(BaseMessage msg, string sender) {
             chat.ScrollToBotton();
             break;
         case SystemMessage { Type: SystemMessage.SysMsgType.Left }:
-            chat.AddSysMessage($"{sender} has left.");
+            throw new UnreachableException();
             break;
         case UserInfoMessage userInfo:
             chat.AddSysMessage($"{userInfo.Name} joined the chat.");
@@ -238,9 +248,12 @@ void HandleMessage(BaseMessage msg, string sender) {
     }
 }
 
-async void Exit(Protocol sess, UniversalEncryption enc) {
-    await sess.Send(PrepareMsg(new SystemMessage(SystemMessage.SysMsgType.Left), enc));
-    shouldExit = true;
+async Task SendLeaveAsync(Protocol sess, UniversalEncryption enc) {
+    try {
+        await sess.Send(PrepareMsg(new SystemMessage(SystemMessage.SysMsgType.Left), enc), CancellationToken.None);
+    }
+    catch { // ignored
+    }
 }
 
 void DetachChatInput() {

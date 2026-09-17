@@ -11,7 +11,7 @@ internal class ChatController {
     private readonly VerticalScrollPanel scrollPanel;
     private readonly Action? tick;
     
-    public Action<string>? OnEnter;
+    public event Action<string>? OnEnter;
     public string Text {
         get => userInput.Text;
         set => userInput.Text = value;

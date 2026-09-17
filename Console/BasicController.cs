@@ -18,7 +18,7 @@ internal class BasicController {
     private int blinkFor = 0;
     private Color? knownColor;
     
-    public Action<string>? OnEnter;
+    public event Action<string>? OnEnter;
 
     private BasicController(IReadOnlyCollection<IInputListener> inputListeners,
         VerticalStackPanel textPan,

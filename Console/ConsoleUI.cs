@@ -117,7 +117,7 @@ public static class ConsoleUI {
         var r = new BreakPanel() {
             Content = new HorizontalStackPanel {
                 Children = new Control[] {
-                    new TextBlock { Text = $"{DateTime.Now:hh:mm}", Color = ConsoleColor.Gray },
+                    new TextBlock { Text = $"{DateTime.Now:HH:mm}", Color = ConsoleColor.Gray },
                     new VerticalSeparator(){Character = new Character(' ')},
                     new TextBlock { Text = name, Color = ConsoleColor.Yellow },
                     new TextBlock { Text = ":" },
