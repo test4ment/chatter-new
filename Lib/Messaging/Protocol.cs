@@ -17,6 +17,7 @@ public class Protocol(IConnectionAsync connection) : IAsyncDisposable
         resumeWriterThreshold: 1 << 19));   // 0.5 MiB
 
     private bool endOfStream;
+    private bool disposed;
 
     public async Task Send(byte[] data, CancellationToken cancellationToken = default)
     {
@@ -153,10 +154,14 @@ public class Protocol(IConnectionAsync connection) : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (disposed) return;
+        disposed = true;
+
         await recvPipe.Writer.CompleteAsync();
         recvPipe.Reader.Complete();
         sendGate.Dispose();
         receiveGate.Dispose();
         readGate.Dispose();
+        (connection as IDisposable)?.Dispose();
     }
 }

@@ -189,8 +189,7 @@ async Task RunSessionAsync(Func<CancellationToken, Task<SocketConnection>> open,
         }
     }
     finally {
-        if (sess != null && enc != null) {
-            await SendLeaveAsync(sess, enc);
+        if (sess != null) {
             await sess.DisposeAsync();
             sess = null;
             enc = null;
@@ -237,13 +236,18 @@ async Task RunChatAsync(Protocol sess, UniversalEncryption enc, string remoteNam
     };
     chat.OnEnter += chatOnEnter;
     
-    Console.CancelKeyPress += async (_, e) => {
+    Console.CancelKeyPress += (__, e) => {
         e.Cancel = true;
         if (appCts.IsCancellationRequested) return;
-        await SendLeaveAsync(sess, enc).ContinueWith(_ => appCts.Cancel());
+        _ = ExitSessionAsync();
     };
 
-    nav.Show(chatScreen);
+    async Task ExitSessionAsync() {
+        await SendLeaveAsync(sess, enc);
+        await sess.DisposeAsync();
+        appCts.Cancel();
+    }
+    
     chat.AddSysMessage($"Connected to {remoteName}. Ctrl+C to leave");
     
     await foreach (var frame in sess.ReadFramesAsync(ct)) {

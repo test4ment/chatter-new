@@ -82,6 +82,12 @@ public class SocketConnection(Socket sock) : IConnectionAsync, IConnection, IDis
     public void Dispose()
     {
         GC.SuppressFinalize(this);
+        try {
+            if (sock.Connected)
+                sock.Shutdown(SocketShutdown.Both);
+        }
+        catch (SocketException) { }
+        catch (ObjectDisposedException) { }
         sock.Dispose();
     }
 }
