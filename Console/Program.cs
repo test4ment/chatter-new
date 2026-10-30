@@ -2,7 +2,6 @@
 using chatter_new_console;
 using System.Net;
 using System.Text;
-using System.Text.Json;
 using chatter_crypto;
 using chatter_messages;
 using chatter_new.Messaging;
@@ -300,9 +299,9 @@ void DetachChatInput() {
 }
 
 byte[] PrepareMsg(BaseMessage msg, UniversalEncryption enc) {
-    return enc.Encrypt(msg.Serialize().Encode());
+    return enc.Encrypt(msg.Serialize());
 }
 
 BaseMessage ProcessMsg(byte[] data, UniversalEncryption enc) {
-    return JsonSerializer.Deserialize<BaseMessage>(enc.Decrypt(data).Decode())!;
+    return BaseMessage.Deserialize(enc.Decrypt(data));
 }

@@ -23,7 +23,7 @@ public class StreamLoader
         Assert.Equal(4, chunks.Count);
 
         foreach (var chunk in chunks)
-            await sendProto.Send(chunk.Serialize().Encode(), TestContext.Current.CancellationToken);
+            await sendProto.Send(chunk.Serialize(), TestContext.Current.CancellationToken);
 
         var reassembled = new byte[payload.Length];
         var offset = 0;
@@ -31,9 +31,10 @@ public class StreamLoader
         {
             var frame = await recvProto.ReadNextFrameAsync(TestContext.Current.CancellationToken);
             Assert.NotNull(frame);
-            var msg = System.Text.Json.JsonSerializer.Deserialize<ChunkedBlob>(frame.Decode())!;
-            Buffer.BlockCopy(msg.Blob.Data, 0, reassembled, offset, msg.Blob.Data.Length);
-            offset += msg.Blob.Data.Length;
+            var msg = BaseMessage.Deserialize(frame!);
+            if (msg is not ChunkedBlob chunk) throw new InvalidOperationException("expected ChunkedBlob");
+            Buffer.BlockCopy(chunk.Blob.Data, 0, reassembled, offset, chunk.Blob.Data.Length);
+            offset += chunk.Blob.Data.Length;
         }
 
         Assert.Equal(payload, reassembled);

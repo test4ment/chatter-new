@@ -1,4 +1,3 @@
-using System.Text.Json;
 using chatter_crypto;
 using chatter_new.Messaging;
 using chatter_new.Messaging.Connection;
@@ -16,7 +15,7 @@ public class SessionTest
         var sess1 = new Protocol(client);
         var sess2 = new Protocol(server);
 
-        var payload = new TextMessage("text").Serialize().Encode();
+        var payload = new TextMessage("text").Serialize();
         
         await sess1.Send(payload, TestContext.Current.CancellationToken);
         await sess1.Send(payload, TestContext.Current.CancellationToken);
@@ -32,8 +31,7 @@ public class SessionTest
             var frame = await sess2.ReadNextFrameAsync(TestContext.Current.CancellationToken);
             Assert.NotNull(frame);
             called++;
-            var s = frame!.Decode();
-            var msg = JsonSerializer.Deserialize<BaseMessage>(s);
+            var msg = BaseMessage.Deserialize(frame!);
             Assert.True(msg is TextMessage);
             Assert.Equal("text", ((TextMessage)msg).Text);
         }
@@ -50,7 +48,7 @@ public class SessionTest
         var sess2 = new Protocol(server);
         
         var enc = new UniversalEncryption(Array.Empty<byte>(), false);
-        var payload = enc.Encrypt(new TextMessage("text").Serialize().Encode());
+        var payload = enc.Encrypt(new TextMessage("text").Serialize());
         await sess1.Send(payload, TestContext.Current.CancellationToken);
         await sess1.Send(payload, TestContext.Current.CancellationToken);
         await sess1.Send(payload, TestContext.Current.CancellationToken);
@@ -65,8 +63,7 @@ public class SessionTest
             var frame = await sess2.ReadNextFrameAsync(TestContext.Current.CancellationToken);
             Assert.NotNull(frame);
             called++;
-            var s = enc.Decrypt(frame!).Decode();
-            var msg = JsonSerializer.Deserialize<BaseMessage>(s);
+            var msg = BaseMessage.Deserialize(enc.Decrypt(frame!));
             Assert.True(msg is TextMessage);
             Assert.Equal("text", ((TextMessage)msg).Text);
         }

@@ -1,43 +1,42 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using MessagePack;
 
 namespace chatter_messages;
 
-[JsonDerivedType(typeof(TextMessage), "text")]
-[JsonDerivedType(typeof(UserInfoMessage), "userinfo")]
-[JsonDerivedType(typeof(SystemMessage), "system")]
-[JsonDerivedType(typeof(BLOBMessage), "blob")]
-[JsonDerivedType(typeof(RetransmittedMessage), "retransmitted")]
-[JsonDerivedType(typeof(ChunkedBlob), "cblob")]
+[MessagePackObject]
+[UnionTag<TextMessage>(0)]
+[UnionTag<UserInfoMessage>(1)]
+[UnionTag<SystemMessage>(2)]
+[UnionTag<BLOBMessage>(3)]
+[UnionTag<RetransmittedMessage>(4)]
+[UnionTag<ChunkedBlob>(5)]
 public abstract class BaseMessage
 {
-    public string Serialize()
-    {
-        return JsonSerializer.Serialize<BaseMessage>(this, Default);
-    }
+    public byte[] Serialize()
+        => MessagePackSerializer.Serialize(this);
 
-    protected static JsonSerializerOptions Default = new JsonSerializerOptions()
-    {
-        IncludeFields = true
-    };
+    public static BaseMessage Deserialize(byte[] data)
+        => MessagePackSerializer.Deserialize<BaseMessage>(data);
 }
 
-[method: JsonConstructor]
+[MessagePackObject]
 public class TextMessage(string text): BaseMessage
 {
+    [Key(0)]
     public string Text { get; init; } = text;
 }
 
-[method: JsonConstructor]
+[MessagePackObject]
 public class UserInfoMessage(string name): BaseMessage
 {
+    [Key(0)]
     public string Name { get; init; } = name;
 }
 
-[method: JsonConstructor]
+[MessagePackObject]
 public class SystemMessage(SystemMessage.SysMsgType type): BaseMessage
 {
-    public SysMsgType Type { get; init; } = type;
+    [Key(0)]
+    public SystemMessage.SysMsgType Type { get; init; } = type;
 
     public enum SysMsgType
     {
@@ -46,16 +45,20 @@ public class SystemMessage(SystemMessage.SysMsgType type): BaseMessage
     }
 }
 
-[method: JsonConstructor]
-public class BLOBMessage(byte[] data, string filename) : BaseMessage
+[MessagePackObject]
+public class BLOBMessage(byte[] data, string filename): BaseMessage
 {
+    [Key(0)]
     public byte[] Data { get; init; } = data;
+    [Key(1)]
     public string Filename { get; init; } = filename;
 }
 
-[method: JsonConstructor]
-public class RetransmittedMessage(string originalSender, BaseMessage msg) : BaseMessage
+[MessagePackObject]
+public class RetransmittedMessage(string originalSender, BaseMessage msg): BaseMessage
 {
+    [Key(0)]
     public string OriginalSender { get; init; } = originalSender;
+    [Key(1)]
     public BaseMessage Msg { get; init; } = msg;
 }

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using chatter_messages;
 
 namespace chatter_new_tests;
@@ -11,8 +10,8 @@ public class MessagesTest
         BaseMessage msg = new TextMessage("Hello world");
 
         var ser = msg.Serialize();
-        var deser = JsonSerializer.Deserialize<BaseMessage>(ser);
-        
+        var deser = BaseMessage.Deserialize(ser);
+
         Assert.Equal(msg.GetType(), deser!.GetType());
         Assert.True(deser is TextMessage);
         Assert.Equal(((TextMessage)msg).Text, ((TextMessage)deser).Text);

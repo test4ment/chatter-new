@@ -1,14 +1,19 @@
 using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
+using MessagePack;
 
 namespace chatter_messages;
 
-[method: JsonConstructor]
+[MessagePackObject]
 public class ChunkedBlob(BLOBMessage Blob, int ChunkIndex, int TotalChunks): BaseMessage
 {
+    [Key(0)]
     public BLOBMessage Blob { get; init; } = Blob;
+    [Key(1)]
     public int ChunkIndex { get; init; } = ChunkIndex;
+    [Key(2)]
     public int TotalChunks { get; init; } = TotalChunks;
+
+    [IgnoreMember]
     public Progress Progress => new() { Current = ChunkIndex + 1, Total = TotalChunks, Num = ChunkIndex };
 }
 

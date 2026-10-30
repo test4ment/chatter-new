@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
-using System.Text.Json;
 using chatter_crypto;
 using chatter_messages;
 using chatter_new.Messaging;
@@ -16,12 +15,12 @@ var tokenHolder = new CancellationTokenSource();
 
 byte[] PrepareMsg(UniversalEncryption enc, BaseMessage msg)
 {
-    return enc.Encrypt(msg.Serialize().Encode());
+    return enc.Encrypt(msg.Serialize());
 }
 
 BaseMessage ProcessMsg(UniversalEncryption enc, byte[] msg)
 {
-    return JsonSerializer.Deserialize<BaseMessage>(enc.Decrypt(msg).Decode())!;
+    return BaseMessage.Deserialize(enc.Decrypt(msg));
 }
 
 var clients = new ConcurrentDictionary<int, (Protocol Session, UniversalEncryption Enc, string Username)>();
