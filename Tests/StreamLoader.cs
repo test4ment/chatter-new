@@ -1,7 +1,6 @@
 using chatter_new.Messaging;
 using chatter_new.Messaging.Connection;
-using chatter_new.Messaging.Datastream;
-using chatter_new.Messaging.Messages;
+using chatter_messages;
 
 namespace chatter_new_tests;
 

@@ -1,8 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
-using chatter_new.Messaging.Messages;
 
-namespace chatter_new.Messaging.Datastream;
+namespace chatter_messages;
 
 [method: JsonConstructor]
 public class ChunkedBlob(BLOBMessage Blob, int ChunkIndex, int TotalChunks): BaseMessage

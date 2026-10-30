@@ -34,6 +34,7 @@
     <ProjectReference Include="..\chatter-crypto\chatter-crypto.csproj" />
     <ProjectReference Include="..\chatter-new-auth\chatter-new-auth.csproj" />
     <ProjectReference Include="..\Lib\chatter-new.csproj" />
+    <ProjectReference Include="..\Messages\chatter-messages.csproj" />
   </ItemGroup>
 
 </Project>

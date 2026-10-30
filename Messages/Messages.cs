@@ -1,8 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using chatter_new.Messaging.Datastream;
 
-namespace chatter_new.Messaging.Messages;
+namespace chatter_messages;
 
 [JsonDerivedType(typeof(TextMessage), "text")]
 [JsonDerivedType(typeof(UserInfoMessage), "userinfo")]

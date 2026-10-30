@@ -2,7 +2,7 @@ using System.Text.Json;
 using chatter_crypto;
 using chatter_new.Messaging;
 using chatter_new.Messaging.Connection;
-using chatter_new.Messaging.Messages;
+using chatter_messages;
 
 namespace chatter_new_tests;
 

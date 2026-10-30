@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Lib\chatter-new.csproj" />
+    <ProjectReference Include="..\Messages\chatter-messages.csproj" />
   </ItemGroup>
 
   <ItemGroup>

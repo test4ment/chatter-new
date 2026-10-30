@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace chatter_new.Messaging.Messages;
+namespace chatter_messages;
 
 internal record MessageMetadata
 {
