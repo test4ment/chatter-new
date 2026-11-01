@@ -23,7 +23,7 @@ public class Protocol(IConnectionAsync connection) : IAsyncDisposable
     {
         await sendGate.WaitAsync(cancellationToken);
         try
-        {
+        { // TODO: messagepack?
             await SendAllAsync(data.Length.Encode(), cancellationToken);
             await SendAllAsync(data, cancellationToken);
         }
