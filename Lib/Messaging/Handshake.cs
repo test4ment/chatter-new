@@ -2,6 +2,7 @@ using chatter_crypto;
 
 namespace chatter_new.Messaging;
 
+[Obsolete("Should be done manually using DHHandshake message")]
 public class DHHandshake(Protocol proto)
 {
     public async Task<UniversalEncryption> Perform(CancellationToken ct = default)

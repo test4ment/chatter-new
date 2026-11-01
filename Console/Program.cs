@@ -6,6 +6,7 @@ using chatter_crypto;
 using chatter_messages;
 using chatter_new.Messaging;
 using chatter_new.Messaging.Connection;
+using DHHandshake = chatter_new.Messaging.DHHandshake;
 
 // TODO: LLM security review
 
