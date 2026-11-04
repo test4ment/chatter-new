@@ -6,6 +6,8 @@ using chatter_crypto;
 using chatter_messages;
 using chatter_new.Messaging;
 using chatter_new.Messaging.Connection;
+using ConsoleGUI;
+using ConsoleGUI.Input;
 using DHHandshake = chatter_new.Messaging.DHHandshake;
 
 // TODO: LLM security review
@@ -15,28 +17,32 @@ Console.OutputEncoding = Encoding.Unicode;
 
 const int defaultPort = 50001;
 
-var (baseUI, @base) = ConsoleUI.BasicIOLayout();
-var (chatUI, chat) = ConsoleUI.ChattingUI();
+var (root, tinput, tout) = ConsoleUI.BasicIOLayout();
+var ioEnter = new EnterInput();
 
-var nav = new ScreenNavigator();
-var menuScreen = new Screen(baseUI, @base.Tick);
-var chatScreen = new Screen(chatUI, chat.Tick);
+var (chatRoot, chatInput, chatMsg, chatBottomInfo) = ConsoleUI.ChattingUI();
+var chatEnter = new EnterInput();
+
+ConsoleManager.Content = root;
+
 
 var appCts = new CancellationTokenSource();
 var appCtx = appCts.Token;
 
 var username = RandomUsername.Generate();
-Action<string>? chatOnEnter = null;
+Action? chatOnEnterHandler = null;
 
-var appState = new State(Menu);
-
-nav.Show(menuScreen);
 ShowMenu();
 
-@base.OnEnter += appState.Handle;
+IReadOnlyCollection<IInputListener>? currentInput = null;
+var currentState = Menu;
+
+ioEnter.OnEnter += () => currentState(tinput.Text);
+IOScreen();
 
 while (true) {
-    nav.Tick();
+    ConsoleManager.ReadInput(currentInput);
+    ConsoleManager.AdjustBufferSize();
     try {
         await Task.Delay(16, appCtx);
     }
@@ -45,11 +51,22 @@ while (true) {
     }
 }
 
+return;
+
+void IOScreen() {
+    ConsoleManager.Content = root;
+    currentInput = [ioEnter, tinput];
+}
+
+void ChatScreen() {
+    ConsoleManager.Content = chatRoot;
+    currentInput = [chatEnter, chatMsg, chatInput];
+}
+
 void ShowMenu() {
-    nav.Show(menuScreen);
-    @base.SetText(
+    tout.SetText(
         // todo: move into tests
-        $"Chatter\nHello {username}!\n\n" +
+        $"Hello {username}!\n \n" +
         $"1. Connect to localhost:{defaultPort}\n" +
         "2. Connect to localhost:16777\n" +
         $"3. Listen on any:{defaultPort}\n" +
@@ -57,9 +74,9 @@ void ShowMenu() {
         "5. Settings\n");
 }
 
-void Menu(string input, State state) {
+void Menu(string input) {
     if (string.IsNullOrWhiteSpace(input.Trim())) {
-        @base.BlinkUserInput();
+        // @base.BlinkUserInput();
         return;
     }
 
@@ -81,22 +98,23 @@ void Menu(string input, State state) {
                 appCtx);
             break;
         case "4":
-            state.ChangeState(ConnectAddress);
-            @base.SetInputText("");
-            ConnectAddress("", state);
+            currentState = ConnectAddress;
+            chatInput.Text = "";
+            ConnectAddress("");
             break;
         case "5":
-            state.ChangeState(Settings);
-            Settings("", state);
+            currentState = Settings;
+            Settings("");
             break;
         default:
-            @base.BlinkUserInput();
+            // @base.BlinkUserInput();
             break;
     }
+    tinput.Text = "";
 }
 
-void ConnectAddress(string input, State state) {
-    @base.SetText(
+void ConnectAddress(string input) {
+    tout.SetText(
         "Connect to address\n\n" +
         $"Enter IP or IP:port (default port: {defaultPort}).\n" +
         "0. Cancel");
@@ -105,7 +123,7 @@ void ConnectAddress(string input, State state) {
 
     var line = input.Trim();
     if (line == "0") {
-        state.ChangeState(Menu);
+        currentState = Menu;
         ShowMenu();
         return;
     }
@@ -114,18 +132,18 @@ void ConnectAddress(string input, State state) {
         line += $":{defaultPort}";
 
     if (!IPEndPoint.TryParse(line, out var endpoint)) {
-        @base.AddMsg("Invalid address. Expected IP:port");
-        @base.BlinkUserInput();
+        tout.AddNotification("Invalid address. Expected IP:port");
+        // @base.BlinkUserInput();
         return;
     }
 
-    state.ChangeState(Menu);
-    @base.SetInputText("");
+    currentState = Menu;
+    chatInput.Text = "";
     _ = RunSessionAsync(ct => SocketConnection.ConnectTo(endpoint, ct), appCtx);
 }
 
-void Settings(string input, State state) {
-    @base.SetText(
+void Settings(string input) {
+    tout.SetText(
         "Settings\n\n" +
         $"Username: {username}\n\n" +
         "1. Regenerate username\n" +
@@ -136,15 +154,15 @@ void Settings(string input, State state) {
     switch (input.Trim()) {
         case "1":
             username = RandomUsername.Generate();
-            @base.AddMsg("New username: " + username);
-            Settings("", state);
+            Settings("");
+            tout.AddNotification("New username: " + username);
             break;
         case "0":
-            state.ChangeState(Menu);
+            currentState = Menu;
             ShowMenu();
             break;
         default:
-            @base.BlinkUserInput();
+            // @base.BlinkUserInput();
             break;
     }
 }
@@ -156,21 +174,22 @@ async Task RunSessionAsync(Func<CancellationToken, Task<SocketConnection>> open,
         using var sessionCts = CancellationTokenSource.CreateLinkedTokenSource(appCtx);
         var sessionCtx = sessionCts.Token;
 
-        nav.Show(chatScreen);
-        chat.AddSysMessage($"Connecting...");
+        ChatScreen();
+
+        chatMsg.AddSysMessage($"Connecting...");
 
         var conn = await open(sessionCtx);
         sess = new Protocol(conn);
-        chat.AddSysMessage($"Connected");
+        chatMsg.AddSysMessage($"Connected");
 
-        chat.AddSysMessage($"Handshaking...");
+        chatMsg.AddSysMessage($"Handshaking...");
         enc = await new DHHandshake(sess).Perform(sessionCtx);
         await sess.Send(PrepareMsg(new UserInfoMessage(username), enc), sessionCtx);
 
-        chat.AddSysMessage("Waiting for remote username...");
+        chatMsg.AddSysMessage("Waiting for remote username...");
         var remoteName = await ReadRemoteNameAsync(sess, enc, sessionCtx);
         if (remoteName is null) {
-            chat.AddSysMessage("Connection closed before the remote announced a username.");
+            chatMsg.AddSysMessage("Connection closed before the remote announced a username.");
             return;
         }
 
@@ -180,7 +199,7 @@ async Task RunSessionAsync(Func<CancellationToken, Task<SocketConnection>> open,
     }
     catch (Exception e) {
         if (!appCtx.IsCancellationRequested) {
-            chat.AddSysMessage("Session error: " + e.Message);
+            chatMsg.AddSysMessage("Session error: " + e.Message);
             try {
                 await Task.Delay(1500, appCtx);
             }
@@ -197,6 +216,7 @@ async Task RunSessionAsync(Func<CancellationToken, Task<SocketConnection>> open,
         if (!appCtx.IsCancellationRequested) {
             DetachChatInput();
             ShowMenu();
+            IOScreen();
         }
     }
 }
@@ -214,27 +234,38 @@ async Task<string?> ReadRemoteNameAsync(Protocol sess, UniversalEncryption enc, 
 async Task RunChatAsync(Protocol sess, UniversalEncryption enc, string remoteName, CancellationToken ct) {
     DetachChatInput();
 
-    chatOnEnter = async void (text) => {
+    var exitToken = CancellationTokenSource.CreateLinkedTokenSource(ct);
+    chatOnEnterHandler = async void () => {
+        var text = chatInput.Text;
         if (string.IsNullOrWhiteSpace(text)) return;
 
         var trimmed = text.Trim();
         if (trimmed.StartsWith("/img", StringComparison.Ordinal)) {
-            chat.AddSysMessage("File sending is not implemented yet.");
-            chat.Text = "";
+            chatMsg.AddSysMessage("File sending is not implemented yet.");
+            chatInput.Text = "";
+            return;
+        }
+
+        if (trimmed == "/exit") {
+            chatMsg.AddSysMessage("Exiting...");
+            chatInput.Text = "";
+            exitToken.Cancel();
+            await SendLeaveAsync(sess, enc);
+            // await sess.DisposeAsync();
             return;
         }
 
         try {
             await sess.Send(PrepareMsg(new TextMessage(text), enc), ct);
-            chat.AddMessage(username, text);
-            chat.Text = "";
-            chat.ScrollToBotton();
+            chatMsg.AddMessage(username, text);
+            chatInput.Text = "";
+            chatMsg.ScrollToBotton();
         }
         catch (Exception e) {
-            chat.AddSysMessage("Failed to send: " + e.Message);
+            chatMsg.AddSysMessage("Failed to send: " + e.Message);
         }
     };
-    chat.OnEnter += chatOnEnter;
+    chatEnter.OnEnter += chatOnEnterHandler;
     
     Console.CancelKeyPress += (__, e) => {
         e.Cancel = true;
@@ -242,44 +273,46 @@ async Task RunChatAsync(Protocol sess, UniversalEncryption enc, string remoteNam
         _ = ExitSessionAsync();
     };
 
-    async Task ExitSessionAsync() {
-        await SendLeaveAsync(sess, enc);
-        await sess.DisposeAsync();
-        appCts.Cancel();
-    }
+    chatMsg.AddSysMessage($"Connected to {remoteName}. Ctrl+C or /exit to leave");
     
-    chat.AddSysMessage($"Connected to {remoteName}. Ctrl+C to leave");
-    
-    await foreach (var frame in sess.ReadFramesAsync(ct)) {
+    await foreach (var frame in sess.ReadFramesAsync(exitToken.Token)) {
         var msg = ProcessMsg(frame, enc);
         if (msg is SystemMessage { Type: SystemMessage.SysMsgType.Left }) {
-            chat.AddSysMessage($"{remoteName} has left.");
+            chatMsg.AddSysMessage($"{remoteName} has left.");
             await Task.Delay(1500, appCtx);
             break;
         }
         HandleMessage(msg, remoteName);
+    }
+
+    return;
+
+    async Task ExitSessionAsync() {
+        await SendLeaveAsync(sess, enc);
+        await sess.DisposeAsync();
+        appCts.Cancel();
     }
 }
 
 void HandleMessage(BaseMessage msg, string sender) {
     switch (msg) {
         case TextMessage tmsg:
-            chat.AddMessage(sender, tmsg.Text);
-            chat.ScrollToBotton();
+            chatMsg.AddMessage(sender, tmsg.Text);
+            chatMsg.ScrollToBotton();
             break;
         case SystemMessage { Type: SystemMessage.SysMsgType.Left }:
             throw new UnreachableException();
         case UserInfoMessage userInfo:
-            chat.AddSysMessage($"{userInfo.Name} joined the chat.");
+            chatMsg.AddSysMessage($"{userInfo.Name} joined the chat.");
             break;
         case BLOBMessage blob:
-            chat.AddSysMessage($"Received file '{blob.Filename}' ({blob.Data.Length} bytes): saving not implemented.");
+            chatMsg.AddSysMessage($"Received file '{blob.Filename}' ({blob.Data.Length} bytes): saving not implemented.");
             break;
         case RetransmittedMessage rmsg:
             HandleMessage(rmsg.Msg, rmsg.OriginalSender);
             break;
         default:
-            chat.AddSysMessage("Received an unknown message.");
+            chatMsg.AddSysMessage("Received an unknown message.");
             break;
     }
 }
@@ -293,9 +326,9 @@ async Task SendLeaveAsync(Protocol sess, UniversalEncryption enc) {
 }
 
 void DetachChatInput() {
-    if (chatOnEnter is not null) {
-        chat.OnEnter -= chatOnEnter;
-        chatOnEnter = null;
+    if (chatOnEnterHandler is not null) {
+        chatEnter.OnEnter -= chatOnEnterHandler;
+        chatOnEnterHandler = null;
     }
 }
 

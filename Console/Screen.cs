@@ -2,6 +2,7 @@ using ConsoleGUI;
 
 namespace chatter_new_console;
 
+[Obsolete]
 internal sealed class Screen(IControl content, Action tick) {
     public IControl Content { get; } = content;
     public Action Tick { get; } = tick;

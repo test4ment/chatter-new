@@ -1,5 +1,6 @@
 namespace chatter_new_console;
 
+[Obsolete]
 public class State(Action<string, State> initial) {
     private Action<string, State> current = initial;
     
