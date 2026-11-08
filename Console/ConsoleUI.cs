@@ -61,27 +61,6 @@ public static class ConsoleUI {
             }, [new TextBlock() { Text = "Downloads (todo)" }]
         );
         
-        // var marg = new Margin { Content = scrollPanel, };
-        // var msgList = new DockPanel() {
-        //     Placement = DockPanel.DockedControlPlacement.Bottom,
-        //     DockedControl = marg
-        // };
-        //
-        // marg.Offset = new Offset(0, 
-        //     Math.Max(msgList.Size.Height - msgs.Size.Height - 1, 0), 
-        //     0, 0);
-        //
-        
-        // var inputs = new List<IInputListener> { scrollPanel, tbox };
-    
-        // throw new NotImplementedException();
-        // var tick = () => {
-        //     marg.Offset = new Offset(0,
-        //         Math.Max(msgList.Size.Height - msgs.Size.Height - 1, 0),
-        //         0, 0);
-        //
-        //     bottomInfo.Text = $"{DateTime.Now:T} \t Type /help to list commands";
-        // };
         return (root, textin, chatHistoryWindow, bottomInfo);
     }
 }
